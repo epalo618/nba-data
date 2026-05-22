@@ -1,46 +1,42 @@
 import { useEffect, useState } from 'react'
 import { useApi } from '../hooks/useApi'
-import { gamesApi, predictionsApi } from '../services/api'
+import { gamesApi, predictionsApi, recordApi } from '../services/api'
 import WinProbBar from '../components/WinProbBar'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { Link } from 'react-router-dom'
 import clsx from 'clsx'
 
-function loadRecord() {
-  try {
-    return JSON.parse(localStorage.getItem('prediction_record') ?? '{"wins":0,"losses":0,"games":{}}')
-  } catch {
-    return { wins: 0, losses: 0, games: {} }
-  }
-}
-
 export default function Dashboard() {
   const { data: gamesData, loading: gamesLoading } = useApi(() => gamesApi.getToday())
   const { data: bestBets, loading: betsLoading } = useApi(() => predictionsApi.getBestBets())
-  const [record, setRecord] = useState<{ wins: number; losses: number }>(() => {
-    const r = loadRecord(); return { wins: r.wins, losses: r.losses }
-  })
+  const { data: recordData, refetch: refetchRecord } = useApi(() => recordApi.get())
+  const [record, setRecord] = useState<{ wins: number; losses: number }>({ wins: 0, losses: 0 })
 
   const games = (gamesData as any)?.games ?? []
 
   useEffect(() => {
-    if (!games.length) return
-    const stored = loadRecord()
-    let updated = false
-    for (const game of games) {
-      const gid = game.GAME_ID
-      if (!gid || stored.games[gid]) continue
-      if (game.GAME_STATUS_ID !== 3) continue
-      if (!game.HOME_SCORE || !game.VISITOR_SCORE || game.HOME_SCORE === game.VISITOR_SCORE) continue
-      const actualWinner = game.HOME_SCORE > game.VISITOR_SCORE ? game.home_team_name : game.away_team_name
-      const correct = game.favored_team === actualWinner
-      stored.wins += correct ? 1 : 0
-      stored.losses += correct ? 0 : 1
-      stored.games[gid] = correct ? 'W' : 'L'
-      updated = true
+    if (recordData) {
+      const r = recordData as any
+      setRecord({ wins: r.wins ?? 0, losses: r.losses ?? 0 })
     }
-    if (updated) localStorage.setItem('prediction_record', JSON.stringify(stored))
-    setRecord({ wins: stored.wins, losses: stored.losses })
+  }, [recordData])
+
+  useEffect(() => {
+    if (!games.length) return
+    const submitCompleted = async () => {
+      for (const game of games) {
+        const gid = game.GAME_ID
+        if (!gid || game.GAME_STATUS_ID !== 3) continue
+        if (!game.HOME_SCORE || !game.VISITOR_SCORE || game.HOME_SCORE === game.VISITOR_SCORE) continue
+        if (!game.favored_team) continue
+        const actualWinner = game.HOME_SCORE > game.VISITOR_SCORE ? game.home_team_name : game.away_team_name
+        try {
+          await recordApi.submit(gid, game.favored_team, actualWinner)
+        } catch {}
+      }
+      refetchRecord?.()
+    }
+    submitCompleted()
   }, [games])
 
   const total = record.wins + record.losses

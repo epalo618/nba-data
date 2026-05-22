@@ -27,3 +27,9 @@ export const predictionsApi = {
     api.get(`/predictions/game/${homeId}/vs/${awayId}/players?top_n=${topN}`),
   getBestBets: () => api.get('/predictions/best-bets'),
 }
+
+export const recordApi = {
+  get: () => api.get('/record'),
+  submit: (game_id: string, predicted_winner: string, actual_winner: string) =>
+    api.post('/record/submit', { game_id, predicted_winner, actual_winner }),
+}
