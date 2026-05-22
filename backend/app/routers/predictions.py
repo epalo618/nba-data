@@ -119,9 +119,21 @@ async def get_best_bets():
                         proj["game"] = f"{game.get('HOME_TEAM_CITY', '')} vs {game.get('VISITOR_TEAM_CITY', '')}"
                         best_bets.append(proj)
 
+        # Pick the single best prop per category, then rank by gap
+        from collections import defaultdict
+        by_stat: dict = defaultdict(list)
+        for bet in best_bets:
+            by_stat[bet["stat"]].append(bet)
+
         stat_order = ["PTS", "REB", "AST", "FG3M", "BLK", "STL"]
-        order_map = {s: i for i, s in enumerate(stat_order)}
-        best_bets.sort(key=lambda x: (order_map.get(x["stat"], 99), -x["gap"]))
-        return best_bets
+        best_per_stat = []
+        for stat in stat_order:
+            group = sorted(by_stat.get(stat, []), key=lambda x: -x["gap"])
+            if group:
+                best_per_stat.append(group[0])
+
+        # Sort the best-per-category list by gap so strongest signal shows first
+        best_per_stat.sort(key=lambda x: -x["gap"])
+        return best_per_stat
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
