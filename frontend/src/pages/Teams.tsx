@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useApi } from '../hooks/useApi'
 import { teamsApi } from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
-import { Link } from 'react-router-dom'
 
 const COLS = [
   { key: 'W', label: 'W' },
@@ -74,9 +73,7 @@ export default function Teams() {
               {teams.map((t: any) => (
                 <tr key={t.TEAM_ID} className="border-b border-surface-border hover:bg-surface-hover">
                   <td className="px-4 py-3">
-                    <Link to={`/teams/${t.TEAM_ID}`} className="text-white font-medium hover:text-brand">
-                      {t.TEAM_NAME}
-                    </Link>
+                    <span className="text-white font-medium">{t.TEAM_NAME}</span>
                   </td>
                   {COLS.map(c => (
                     <td key={c.key} className="px-3 py-3 text-right text-gray-300">

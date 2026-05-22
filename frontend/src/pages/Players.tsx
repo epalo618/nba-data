@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useApi } from '../hooks/useApi'
 import { playersApi } from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
-import { Link } from 'react-router-dom'
 
 const COLS = [
   { key: 'GP', label: 'GP' },
@@ -84,9 +83,7 @@ export default function Players() {
                 {paginated.map((p: any) => (
                   <tr key={p.PLAYER_ID} className="border-b border-surface-border hover:bg-surface-hover">
                     <td className="px-4 py-2">
-                      <Link to={`/players/${p.PLAYER_ID}`} className="text-white font-medium hover:text-brand">
-                        {p.PLAYER_NAME}
-                      </Link>
+                      <span className="text-white font-medium">{p.PLAYER_NAME}</span>
                     </td>
                     <td className="px-3 py-2 text-gray-400">{p.TEAM_ABBREVIATION}</td>
                     {COLS.map(c => (
