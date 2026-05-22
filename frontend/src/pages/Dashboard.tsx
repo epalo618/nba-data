@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { useApi } from '../hooks/useApi'
 import { gamesApi, predictionsApi } from '../services/api'
 import WinProbBar from '../components/WinProbBar'
@@ -5,17 +6,61 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import { Link } from 'react-router-dom'
 import clsx from 'clsx'
 
+function loadRecord() {
+  try {
+    return JSON.parse(localStorage.getItem('prediction_record') ?? '{"wins":0,"losses":0,"games":{}}')
+  } catch {
+    return { wins: 0, losses: 0, games: {} }
+  }
+}
+
 export default function Dashboard() {
   const { data: gamesData, loading: gamesLoading } = useApi(() => gamesApi.getToday())
   const { data: bestBets, loading: betsLoading } = useApi(() => predictionsApi.getBestBets())
+  const [record, setRecord] = useState<{ wins: number; losses: number }>(() => {
+    const r = loadRecord(); return { wins: r.wins, losses: r.losses }
+  })
 
   const games = (gamesData as any)?.games ?? []
 
+  useEffect(() => {
+    if (!games.length) return
+    const stored = loadRecord()
+    let updated = false
+    for (const game of games) {
+      const gid = game.GAME_ID
+      if (!gid || stored.games[gid]) continue
+      if (game.GAME_STATUS_ID !== 3) continue
+      if (!game.HOME_SCORE || !game.VISITOR_SCORE || game.HOME_SCORE === game.VISITOR_SCORE) continue
+      const actualWinner = game.HOME_SCORE > game.VISITOR_SCORE ? game.home_team_name : game.away_team_name
+      const correct = game.favored_team === actualWinner
+      stored.wins += correct ? 1 : 0
+      stored.losses += correct ? 0 : 1
+      stored.games[gid] = correct ? 'W' : 'L'
+      updated = true
+    }
+    if (updated) localStorage.setItem('prediction_record', JSON.stringify(stored))
+    setRecord({ wins: stored.wins, losses: stored.losses })
+  }, [games])
+
+  const total = record.wins + record.losses
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-10">
-      <div>
-        <h1 className="text-2xl font-bold text-white mb-1">Today's Games</h1>
-        <p className="text-gray-500 text-sm">Win probabilities and projected totals for all NBA games today.</p>
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white mb-1">Today's Games</h1>
+          <p className="text-gray-500 text-sm">Win probabilities and projected totals for all NBA games today.</p>
+        </div>
+        <div className="flex items-center gap-3 bg-surface-card border border-surface-border rounded-xl px-5 py-3">
+          <span className="text-gray-500 text-sm font-medium">Model Record</span>
+          <span className="text-green-400 font-bold text-xl">{record.wins}W</span>
+          <span className="text-gray-600">–</span>
+          <span className="text-red-400 font-bold text-xl">{record.losses}L</span>
+          {total > 0 && (
+            <span className="text-gray-500 text-sm">({Math.round(record.wins / total * 100)}%)</span>
+          )}
+        </div>
       </div>
 
       {gamesLoading ? (
