@@ -219,6 +219,38 @@ def get_team_last_n_games(team_id: int, n: int = 10):
     return _cached(key, fetch)
 
 
+def get_head_to_head(team_id: int, opp_team_id: int) -> dict:
+    """Returns this-season H2H record between two teams (playoffs + reg season)."""
+    key = f"h2h_{min(team_id, opp_team_id)}_{max(team_id, opp_team_id)}"
+    def fetch():
+        all_static = nba_teams_static.get_teams()
+        opp_info = next((t for t in all_static if t["id"] == opp_team_id), {})
+        opp_abbr = opp_info.get("abbreviation", "")
+
+        playoff_resp = teamgamelog.TeamGameLog(
+            team_id=team_id,
+            season=CURRENT_SEASON,
+            season_type_all_star="Playoffs",
+            timeout=60,
+        )
+        playoff_games = playoff_resp.get_data_frames()[0].to_dict(orient="records")
+
+        time.sleep(0.3)
+        reg_resp = teamgamelog.TeamGameLog(
+            team_id=team_id,
+            season=CURRENT_SEASON,
+            timeout=60,
+        )
+        reg_games = reg_resp.get_data_frames()[0].to_dict(orient="records")
+
+        all_games = playoff_games + reg_games
+        h2h = [g for g in all_games if opp_abbr and opp_abbr in g.get("MATCHUP", "")]
+        wins = sum(1 for g in h2h if g.get("WL") == "W")
+        losses = sum(1 for g in h2h if g.get("WL") == "L")
+        return {"team_wins": wins, "opp_wins": losses, "games_played": len(h2h)}
+    return _cached(key, fetch)
+
+
 def get_player_last_n_games(player_id: int, n: int = 10):
     key = f"player_gamelog_{player_id}"
     def fetch():

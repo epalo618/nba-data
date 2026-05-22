@@ -38,6 +38,11 @@ async def get_todays_games():
                 win_probs = {"home_win_prob": 0.5, "away_win_prob": 0.5, "favored_team": None, "reasons": [], "factors": {}}
                 proj_total = 220.0
 
+            try:
+                h2h = nba_service.get_head_to_head(home_id, away_id)
+            except Exception:
+                h2h = {"team_wins": 0, "opp_wins": 0, "games_played": 0}
+
             # Match odds
             odds_key = f"{home_name}|{away_name}"
             game_odds = odds_map.get(odds_key, {})
@@ -61,6 +66,9 @@ async def get_todays_games():
                 "over_under_line": over_under_line,
                 "over_under_rec": ou_rec,
                 "odds": game_odds,
+                "h2h_home_wins": h2h["team_wins"],
+                "h2h_away_wins": h2h["opp_wins"],
+                "h2h_games_played": h2h["games_played"],
             })
 
         return {"games": enriched, "line_score": line_score}
