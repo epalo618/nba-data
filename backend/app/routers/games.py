@@ -80,8 +80,8 @@ async def get_matchup(home_team_id: int, away_team_id: int):
         away_log = nba_service.get_team_last_n_games(away_team_id, 10)
         home_pts = [g.get("PTS", 0) for g in home_log]
         away_pts = [g.get("PTS", 0) for g in away_log]
-        home_allowed = [g.get("PTS", 0) - g.get("PLUS_MINUS", 0) for g in home_log]
-        away_allowed = [g.get("PTS", 0) - g.get("PLUS_MINUS", 0) for g in away_log]
+        home_allowed = [g.get("PTS_ALLOWED", 0) for g in home_log]
+        away_allowed = [g.get("PTS_ALLOWED", 0) for g in away_log]
 
         return {
             "home_team_id": home_team_id,

@@ -4,6 +4,7 @@ from datetime import date
 from nba_api.stats.endpoints import (
     leaguedashteamstats,
     leaguedashplayerstats,
+    leaguegamelog,
     scoreboardv3,
     teamgamelog,
     playergamelog,
@@ -21,6 +22,35 @@ def _cached(key: str, fn):
     data = fn()
     _cache[key] = {"data": data, "ts": now}
     return data
+
+
+def _get_all_game_scores() -> dict:
+    """Returns {game_id: {team_id: pts}} for reg season + playoffs."""
+    def fetch():
+        reg_df = leaguegamelog.LeagueGameLog(
+            season=CURRENT_SEASON,
+            player_or_team_abbreviation="T",
+            timeout=30,
+        ).get_data_frames()[0]
+
+        time.sleep(0.5)
+        playoff_df = leaguegamelog.LeagueGameLog(
+            season=CURRENT_SEASON,
+            season_type_all_star="Playoffs",
+            player_or_team_abbreviation="T",
+            timeout=30,
+        ).get_data_frames()[0]
+
+        pts_map: dict = {}
+        for df in [reg_df, playoff_df]:
+            for row in df.to_dict(orient="records"):
+                gid = row.get("GAME_ID")
+                tid = row.get("TEAM_ID")
+                pts = row.get("PTS")
+                if gid and tid and pts is not None:
+                    pts_map.setdefault(gid, {})[tid] = pts
+        return pts_map
+    return _cached("all_game_scores", fetch)
 
 
 def get_all_teams():
@@ -162,16 +192,25 @@ def get_team_last_n_games(team_id: int, n: int = 10):
         playoff_games = playoff_resp.get_data_frames()[0].to_dict(orient="records")
 
         if len(playoff_games) >= n:
-            return playoff_games[:n]
+            games = playoff_games[:n]
+        else:
+            time.sleep(0.3)
+            reg_resp = teamgamelog.TeamGameLog(
+                team_id=team_id,
+                season=CURRENT_SEASON,
+                timeout=30,
+            )
+            reg_games = reg_resp.get_data_frames()[0].to_dict(orient="records")
+            games = (playoff_games + reg_games[:n - len(playoff_games)])[:n]
 
-        time.sleep(0.3)
-        reg_resp = teamgamelog.TeamGameLog(
-            team_id=team_id,
-            season=CURRENT_SEASON,
-            timeout=30,
-        )
-        reg_games = reg_resp.get_data_frames()[0].to_dict(orient="records")
-        return (playoff_games + reg_games[:n - len(playoff_games)])[:n]
+        # Enrich each game with PTS_ALLOWED using the league-wide scores map
+        pts_map = _get_all_game_scores()
+        for g in games:
+            gid = g.get("Game_ID") or g.get("GAME_ID")
+            game_scores = pts_map.get(gid, {})
+            opp_pts = next((v for k, v in game_scores.items() if int(k) != team_id), None)
+            g["PTS_ALLOWED"] = opp_pts if opp_pts is not None else g.get("PTS", 0)
+        return games
     return _cached(key, fetch)
 
 
