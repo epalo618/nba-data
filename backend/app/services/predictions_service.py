@@ -222,20 +222,24 @@ def project_player_stats(player_id: int, opponent_team_id: int, stat_cols: list[
         "AST": "AST",
         "STL": "STL",
         "BLK": "BLK",
+        "FG3M": "FG3M",
+        "FG3_PCT": "FG3_PCT",
     }
+    pct_stats = {"FG3_PCT"}
 
     for stat in stat_cols:
         col = stat_map.get(stat, stat)
-        season_avg = player.get(col, 0) or 0
+        is_pct = stat in pct_stats
+        scale = 100 if is_pct else 1
+        season_avg = (player.get(col, 0) or 0) * scale
 
-        def _avg(games, col):
-            vals = [g.get(col, 0) or 0 for g in games if g.get(col) is not None]
+        def _avg(games, col, scale=scale):
+            vals = [(g.get(col, 0) or 0) * scale for g in games if g.get(col) is not None]
             return round(np.mean(vals), 1) if vals else season_avg
 
         l5 = _avg(last5, col)
         l10 = _avg(last10, col)
 
-        # Slight opponent adjustment: rank 1 = weak defense = boost, rank 30 = strong defense = penalty
         opp_factor = (16 - opp_rank) / 100  # -0.15 to +0.15
         projection = round(
             0.40 * season_avg + 0.35 * l10 + 0.15 * l5 + 0.10 * (season_avg * (1 + opp_factor)),
@@ -246,7 +250,7 @@ def project_player_stats(player_id: int, opponent_team_id: int, stat_cols: list[
             "player_id": player_id,
             "player_name": player.get("PLAYER_NAME", ""),
             "team_abbreviation": player.get("TEAM_ABBREVIATION", ""),
-            "stat": stat,
+            "stat": "3P%" if stat == "FG3_PCT" else stat,
             "season_avg": round(season_avg, 1),
             "last5_avg": l5,
             "last10_avg": l10,

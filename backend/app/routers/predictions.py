@@ -9,7 +9,7 @@ from app.services import nba_service
 
 router = APIRouter()
 
-PROP_STATS = ["PTS", "REB", "AST", "STL", "BLK"]
+PROP_STATS = ["PTS", "REB", "AST", "STL", "BLK", "FG3M", "FG3_PCT"]
 
 
 @router.get("/player/{player_id}/vs/{opponent_team_id}")
