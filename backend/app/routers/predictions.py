@@ -5,7 +5,7 @@ from app.services.predictions_service import (
     calculate_win_probability,
     calculate_projected_total,
 )
-from app.services import nba_service, odds_service
+from app.services import nba_service
 
 router = APIRouter()
 
@@ -72,21 +72,12 @@ def get_game_player_projections(home_team_id: int, away_team_id: int, top_n: int
 
 
 @router.get("/best-bets")
-async def get_best_bets():
-    """Returns top prop bets of the day based on projection vs sportsbook line gap."""
+def get_best_bets():
+    """Returns top prop bets of the day based on projection vs reg season avg gap."""
     try:
         data = nba_service.get_todays_games()
         games = data["games"]
         all_player_stats = nba_service.get_player_season_stats()
-
-        # Fetch player prop lines from odds API
-        prop_lines: dict = {}
-        events = await odds_service.get_nba_events()
-        for event in events:
-            bookmakers = await odds_service.get_player_props(event["id"])
-            player_map = odds_service.parse_player_props(bookmakers)
-            for player, stats in player_map.items():
-                prop_lines.setdefault(player, {}).update(stats)
 
         best_bets = []
         for game in games:
@@ -107,17 +98,11 @@ async def get_best_bets():
                         projs = project_player_stats(p["PLAYER_ID"], opp_id, ["PTS", "REB", "AST", "FG3M", "STL", "BLK"])
                     except Exception:
                         continue
-                    player_props = prop_lines.get(p.get("PLAYER_NAME", ""), {})
                     for proj in projs:
-                        prop = player_props.get(proj["stat"], {})
-                        line = prop.get("line")
-                        if line is None:
+                        baseline = proj["reg_season_avg"]
+                        gap = abs(proj["projection"] - baseline)
+                        if gap / max(baseline, 0.1) < 0.12:
                             continue
-                        gap = abs(proj["projection"] - line)
-                        if gap / max(line, 0.1) < 0.08:
-                            continue
-                        proj["line"] = line
-                        proj["line_source"] = prop.get("book")
                         proj["gap"] = round(gap, 2)
                         proj["game"] = f"{game.get('HOME_TEAM_CITY', '')} vs {game.get('VISITOR_TEAM_CITY', '')}"
                         best_bets.append(proj)
