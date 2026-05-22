@@ -245,10 +245,20 @@ def project_player_stats(player_id: int, opponent_team_id: int, stat_cols: list[
         l10 = _avg(last10, col)
 
         opp_factor = (16 - opp_rank) / 100  # -0.15 to +0.15
-        projection = round(
-            0.40 * season_avg + 0.35 * l10 + 0.15 * l5 + 0.10 * (season_avg * (1 + opp_factor)),
-            1,
-        )
+        if playoff_avg is not None:
+            projection = round(
+                0.20 * reg_avg
+                + 0.25 * playoff_avg
+                + 0.35 * l10
+                + 0.15 * l5
+                + 0.05 * (season_avg * (1 + opp_factor)),
+                1,
+            )
+        else:
+            projection = round(
+                0.40 * season_avg + 0.35 * l10 + 0.15 * l5 + 0.10 * (season_avg * (1 + opp_factor)),
+                1,
+            )
 
         results.append({
             "player_id": player_id,
