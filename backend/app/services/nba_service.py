@@ -113,15 +113,20 @@ def get_player_season_stats():
         result = []
         for row in reg_records:
             pid = row["PLAYER_ID"]
+            blended = dict(row)
             if pid in playoff_map:
                 prow = playoff_map[pid]
-                blended = dict(row)
                 for col in blend_cols:
                     if col in row and col in prow:
+                        blended[f"{col}_REG"] = round(row[col] or 0, 1)
+                        blended[f"{col}_PLAYOFF"] = round(prow[col] or 0, 1)
                         blended[col] = round(0.5 * (row[col] or 0) + 0.5 * (prow[col] or 0), 1)
-                result.append(blended)
             else:
-                result.append(row)
+                for col in blend_cols:
+                    if col in row:
+                        blended[f"{col}_REG"] = round(row[col] or 0, 1)
+                        blended[f"{col}_PLAYOFF"] = None
+            result.append(blended)
         return result
     return _cached("player_season_stats", fetch)
 

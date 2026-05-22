@@ -233,6 +233,11 @@ def project_player_stats(player_id: int, opponent_team_id: int, stat_cols: list[
         scale = 100 if is_pct else 1
         season_avg = (player.get(col, 0) or 0) * scale
 
+        raw_reg = player.get(f"{col}_REG")
+        raw_playoff = player.get(f"{col}_PLAYOFF")
+        reg_avg = round((raw_reg or 0) * scale, 1) if raw_reg is not None else round(season_avg, 1)
+        playoff_avg = round((raw_playoff or 0) * scale, 1) if raw_playoff is not None else None
+
         def _avg(games, col, scale=scale):
             vals = [(g.get(col, 0) or 0) * scale for g in games if g.get(col) is not None]
             return round(np.mean(vals), 1) if vals else season_avg
@@ -252,6 +257,8 @@ def project_player_stats(player_id: int, opponent_team_id: int, stat_cols: list[
             "team_abbreviation": player.get("TEAM_ABBREVIATION", ""),
             "stat": "3P%" if stat == "FG3_PCT" else stat,
             "season_avg": round(season_avg, 1),
+            "reg_season_avg": reg_avg,
+            "playoff_avg": playoff_avg,
             "last5_avg": l5,
             "last10_avg": l10,
             "opponent_rank": opp_rank,

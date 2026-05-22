@@ -125,9 +125,10 @@ export default function GameMatchup() {
                 {players.map((p: any) => (
                   <div key={p.player_id} className="mb-5">
                     <div className="text-sm font-bold text-brand mb-1">{p.player_name}</div>
-                    <div className="grid grid-cols-7 gap-2 text-xs text-gray-600 mb-1 px-0">
+                    <div className="grid grid-cols-8 gap-2 text-xs text-gray-600 mb-1 px-0">
                       <span>STAT</span>
-                      <span>AVG</span>
+                      <span>REG</span>
+                      <span className="text-yellow-700">POST</span>
                       <span>L10</span>
                       <span>L5</span>
                       <span className="font-semibold text-gray-400">PROJ</span>
