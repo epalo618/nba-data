@@ -12,7 +12,6 @@ export default function Predictions() {
   const rebBets = bets.filter(b => b.stat === 'REB')
   const astBets = bets.filter(b => b.stat === 'AST')
   const fg3mBets = bets.filter(b => b.stat === 'FG3M')
-  const fg3pctBets = bets.filter(b => b.stat === '3P%')
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
@@ -35,7 +34,6 @@ export default function Predictions() {
             { label: 'Rebound Props', bets: rebBets },
             { label: 'Assist Props', bets: astBets },
             { label: '3-Pointers Made', bets: fg3mBets },
-            { label: '3-Point % Props', bets: fg3pctBets },
           ].map(({ label, bets: catBets }) => (
             <div key={label}>
               <h2 className="text-lg font-bold text-white mb-3">{label}</h2>

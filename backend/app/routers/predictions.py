@@ -9,7 +9,7 @@ from app.services import nba_service
 
 router = APIRouter()
 
-PROP_STATS = ["PTS", "REB", "AST", "STL", "BLK", "FG3M", "FG3_PCT"]
+PROP_STATS = ["PTS", "REB", "AST", "STL", "BLK", "FG3M"]
 
 
 @router.get("/player/{player_id}/vs/{opponent_team_id}")
@@ -94,7 +94,7 @@ def get_best_bets():
                 )[:6]
 
                 for p in team_players:
-                    projs = project_player_stats(p["PLAYER_ID"], opp_id, ["PTS", "REB", "AST", "FG3M", "FG3_PCT"])
+                    projs = project_player_stats(p["PLAYER_ID"], opp_id, ["PTS", "REB", "AST", "FG3M"])
                     for proj in projs:
                         proj["game"] = f"{game.get('HOME_TEAM_CITY', '')} vs {game.get('VISITOR_TEAM_CITY', '')}"
                         best_bets.append(proj)
