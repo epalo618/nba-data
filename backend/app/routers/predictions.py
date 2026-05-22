@@ -108,10 +108,10 @@ async def get_best_bets():
                     for proj in projs:
                         prop = player_props.get(proj["stat"], {})
                         line = prop.get("line")
-                        if line is None:
-                            continue
-                        gap = abs(proj["projection"] - line)
-                        if gap / max(line, 0.1) < 0.08:
+                        baseline = line if line is not None else proj["season_avg"]
+                        gap = abs(proj["projection"] - baseline)
+                        threshold = 0.08 if line is not None else 0.12
+                        if gap / max(baseline, 0.1) < threshold:
                             continue
                         proj["line"] = line
                         proj["line_source"] = prop.get("book")
