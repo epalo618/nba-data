@@ -99,8 +99,8 @@ def get_best_bets():
                         proj["game"] = f"{game.get('HOME_TEAM_CITY', '')} vs {game.get('VISITOR_TEAM_CITY', '')}"
                         best_bets.append(proj)
 
-        # Sort by confidence gap (projection distance from typical line)
-        best_bets.sort(key=lambda x: abs(x["projection"] - x["season_avg"]), reverse=True)
-        return best_bets[:20]
+        # Sort within each stat category by divergence from season avg
+        best_bets.sort(key=lambda x: (x["stat"], -abs(x["projection"] - x["season_avg"])))
+        return best_bets
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
