@@ -1,0 +1,8 @@
+fastapi==0.136.1
+uvicorn==0.47.0
+nba_api==1.11.4
+httpx==0.28.1
+python-dotenv==1.2.2
+pandas==3.0.3
+numpy==2.4.6
+pydantic==2.13.4
