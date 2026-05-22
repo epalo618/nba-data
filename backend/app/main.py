@@ -1,9 +1,31 @@
 import os
+import asyncio
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import teams, players, games, predictions, record
 
-app = FastAPI(title="NBA Analytics API", version="1.0.0")
+
+def _prewarm_caches():
+    """Pre-warm heavy caches on startup so first user request is fast."""
+    try:
+        from app.services import nba_service
+        nba_service.get_player_season_stats()
+        nba_service.get_team_season_stats()
+        nba_service.get_team_advanced_stats()
+        nba_service.get_todays_games()
+    except Exception:
+        pass  # don't crash startup if NBA API is down
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    loop = asyncio.get_event_loop()
+    loop.run_in_executor(None, _prewarm_caches)
+    yield
+
+
+app = FastAPI(title="NBA Analytics API", version="1.0.0", lifespan=lifespan)
 
 allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 

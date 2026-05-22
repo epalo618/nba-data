@@ -91,7 +91,7 @@ def get_player_season_stats():
         reg_resp = leaguedashplayerstats.LeagueDashPlayerStats(
             season=CURRENT_SEASON,
             per_mode_detailed="PerGame",
-            timeout=30,
+            timeout=60,
         )
         reg_records = reg_resp.get_data_frames()[0].to_dict(orient="records")
 
@@ -100,7 +100,7 @@ def get_player_season_stats():
             season=CURRENT_SEASON,
             season_type_all_star="Playoffs",
             per_mode_detailed="PerGame",
-            timeout=30,
+            timeout=60,
         )
         playoff_records = playoff_resp.get_data_frames()[0].to_dict(orient="records")
 
@@ -226,7 +226,7 @@ def get_player_last_n_games(player_id: int, n: int = 10):
             player_id=player_id,
             season=CURRENT_SEASON,
             season_type_all_star="Playoffs",
-            timeout=30,
+            timeout=60,
         )
         playoff_games = playoff_resp.get_data_frames()[0].to_dict(orient="records")
 
@@ -237,7 +237,7 @@ def get_player_last_n_games(player_id: int, n: int = 10):
         reg_resp = playergamelog.PlayerGameLog(
             player_id=player_id,
             season=CURRENT_SEASON,
-            timeout=30,
+            timeout=60,
         )
         reg_games = reg_resp.get_data_frames()[0].to_dict(orient="records")
         return (playoff_games + reg_games[:n - len(playoff_games)])[:n]

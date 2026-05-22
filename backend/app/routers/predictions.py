@@ -103,7 +103,10 @@ async def get_best_bets():
                 )[:6]
 
                 for p in team_players:
-                    projs = project_player_stats(p["PLAYER_ID"], opp_id, ["PTS", "REB", "AST", "FG3M", "STL", "BLK"])
+                    try:
+                        projs = project_player_stats(p["PLAYER_ID"], opp_id, ["PTS", "REB", "AST", "FG3M", "STL", "BLK"])
+                    except Exception:
+                        continue
                     player_props = prop_lines.get(p.get("PLAYER_NAME", ""), {})
                     for proj in projs:
                         prop = player_props.get(proj["stat"], {})
