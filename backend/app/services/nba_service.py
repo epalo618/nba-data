@@ -30,7 +30,7 @@ def _get_all_game_scores() -> dict:
         reg_df = leaguegamelog.LeagueGameLog(
             season=CURRENT_SEASON,
             player_or_team_abbreviation="T",
-            timeout=30,
+            timeout=60,
         ).get_data_frames()[0]
 
         time.sleep(0.5)
@@ -38,7 +38,7 @@ def _get_all_game_scores() -> dict:
             season=CURRENT_SEASON,
             season_type_all_star="Playoffs",
             player_or_team_abbreviation="T",
-            timeout=30,
+            timeout=60,
         ).get_data_frames()[0]
 
         pts_map: dict = {}

@@ -10,10 +10,11 @@ def _prewarm_caches():
     """Pre-warm heavy caches on startup so first user request is fast."""
     try:
         from app.services import nba_service
-        nba_service.get_player_season_stats()
         nba_service.get_team_season_stats()
         nba_service.get_team_advanced_stats()
         nba_service.get_todays_games()
+        nba_service._get_all_game_scores()
+        nba_service.get_player_season_stats()
     except Exception:
         pass  # don't crash startup if NBA API is down
 
