@@ -119,24 +119,9 @@ async def get_best_bets():
                         proj["game"] = f"{game.get('HOME_TEAM_CITY', '')} vs {game.get('VISITOR_TEAM_CITY', '')}"
                         best_bets.append(proj)
 
-        # Group by stat, sort each group by gap desc, round-robin to mix stat types
-        from collections import defaultdict
-        by_stat: dict = defaultdict(list)
-        for bet in best_bets:
-            by_stat[bet["stat"]].append(bet)
-        for stat in by_stat:
-            by_stat[stat].sort(key=lambda x: -x["gap"])
-
-        mixed = []
-        stat_order = ["PTS", "REB", "AST", "FG3M", "STL", "BLK"]
-        queues = [by_stat[s] for s in stat_order if s in by_stat]
-        i = 0
-        while len(mixed) < 20 and any(queues):
-            q = queues[i % len(queues)]
-            if q:
-                mixed.append(q.pop(0))
-            i += 1
-
-        return mixed
+        stat_order = ["PTS", "REB", "AST", "FG3M", "BLK", "STL"]
+        order_map = {s: i for i, s in enumerate(stat_order)}
+        best_bets.sort(key=lambda x: (order_map.get(x["stat"], 99), -x["gap"]))
+        return best_bets
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
