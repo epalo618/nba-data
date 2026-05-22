@@ -141,22 +141,24 @@ export default function Dashboard() {
           <LoadingSpinner label="Calculating projections..." />
         ) : (
           <div className="bg-surface-card border border-surface-border rounded-xl overflow-hidden">
-            <div className="grid grid-cols-6 gap-2 px-4 py-2 text-xs text-gray-500 uppercase border-b border-surface-border">
+            <div className="grid grid-cols-8 gap-2 px-4 py-2 text-xs text-gray-500 uppercase border-b border-surface-border">
               <span>Player</span>
               <span>Stat</span>
-              <span>Season Avg</span>
+              <span>Reg Avg</span>
+              <span className="text-yellow-600">Post Avg</span>
               <span>Projection</span>
               <span>Game</span>
-              <span>Signal</span>
+              <span className="col-span-2">Signal</span>
             </div>
             {((bestBets as any[]) ?? []).slice(0, 15).map((bet: any, i: number) => (
-              <div key={i} className="grid grid-cols-6 gap-2 px-4 py-3 border-b border-surface-border hover:bg-surface-hover text-sm">
+              <div key={i} className="grid grid-cols-8 gap-2 px-4 py-3 border-b border-surface-border hover:bg-surface-hover text-sm">
                 <span className="text-white font-medium">{bet.player_name}</span>
                 <span className="text-gray-400 font-semibold">{bet.stat}</span>
-                <span className="text-gray-400">{bet.season_avg}</span>
+                <span className="text-gray-400">{bet.reg_season_avg ?? bet.season_avg}</span>
+                <span className="text-yellow-400">{bet.playoff_avg ?? '—'}</span>
                 <span className="text-white font-bold">{bet.projection}</span>
                 <span className="text-gray-500 text-xs truncate">{bet.game}</span>
-                <span className={clsx('font-bold text-xs',
+                <span className={clsx('font-bold text-xs col-span-2',
                   bet.projection > bet.season_avg ? 'text-green-400' : 'text-red-400'
                 )}>
                   {bet.projection > bet.season_avg ? '↑ HIGH' : '↓ LOW'}
