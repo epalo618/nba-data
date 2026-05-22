@@ -161,9 +161,9 @@ export default function Dashboard() {
                   {bet.line != null ? `${bet.line} (${bet.line_source})` : '—'}
                 </span>
                 <span className={clsx('font-bold text-xs',
-                  bet.projection > bet.season_avg ? 'text-green-400' : 'text-red-400'
+                  bet.projection > (bet.line ?? bet.season_avg) ? 'text-green-400' : 'text-red-400'
                 )}>
-                  {bet.projection > bet.season_avg ? '↑ OVER' : '↓ UNDER'}
+                  {bet.projection > (bet.line ?? bet.season_avg) ? '↑ OVER' : '↓ UNDER'}
                 </span>
               </div>
             ))}

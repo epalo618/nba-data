@@ -16,8 +16,9 @@ interface Projection {
 }
 
 export default function PlayerPropRow({ proj }: { proj: Projection }) {
-  const diff = proj.line != null ? proj.projection - proj.line : null
-  const rec = proj.recommendation ?? (diff != null ? (diff > 0 ? 'OVER' : 'UNDER') : null)
+  const baseline = proj.line ?? proj.season_avg
+  const diff = proj.projection - baseline
+  const rec = proj.recommendation ?? (diff > 0 ? 'OVER' : 'UNDER')
 
   return (
     <div className="grid grid-cols-8 gap-2 items-center py-2 border-b border-surface-border text-sm">

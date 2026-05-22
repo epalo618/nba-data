@@ -49,8 +49,9 @@ export default function Predictions() {
                   <span className="text-right">Signal</span>
                 </div>
                 {catBets.slice(0, 10).map((bet: any, i: number) => {
-                  const isOver = bet.projection > bet.season_avg
-                  const diffPct = Math.abs((bet.projection - bet.season_avg) / Math.max(bet.season_avg, 1)) * 100
+                  const baseline = bet.line ?? bet.season_avg
+                  const isOver = bet.projection > baseline
+                  const diffPct = Math.abs((bet.projection - baseline) / Math.max(baseline, 1)) * 100
                   const conf = diffPct > 15 ? 'STRONG' : diffPct > 10 ? 'HIGH' : diffPct > 5 ? 'MED' : 'LOW'
                   return (
                     <div key={i} className="grid grid-cols-9 gap-2 px-4 py-3 border-b border-surface-border hover:bg-surface-hover items-center">
