@@ -58,13 +58,41 @@ def get_team_advanced_stats():
 
 def get_player_season_stats():
     def fetch():
-        resp = leaguedashplayerstats.LeagueDashPlayerStats(
+        reg_resp = leaguedashplayerstats.LeagueDashPlayerStats(
             season=CURRENT_SEASON,
             per_mode_detailed="PerGame",
             timeout=30,
         )
-        df = resp.get_data_frames()[0]
-        return df.to_dict(orient="records")
+        reg_records = reg_resp.get_data_frames()[0].to_dict(orient="records")
+
+        time.sleep(0.5)
+        playoff_resp = leaguedashplayerstats.LeagueDashPlayerStats(
+            season=CURRENT_SEASON,
+            season_type_all_star="Playoffs",
+            per_mode_detailed="PerGame",
+            timeout=30,
+        )
+        playoff_records = playoff_resp.get_data_frames()[0].to_dict(orient="records")
+
+        if not playoff_records:
+            return reg_records
+
+        blend_cols = ["PTS", "REB", "AST", "STL", "BLK", "MIN"]
+        playoff_map = {r["PLAYER_ID"]: r for r in playoff_records}
+
+        result = []
+        for row in reg_records:
+            pid = row["PLAYER_ID"]
+            if pid in playoff_map:
+                prow = playoff_map[pid]
+                blended = dict(row)
+                for col in blend_cols:
+                    if col in row and col in prow:
+                        blended[col] = round(0.5 * (row[col] or 0) + 0.5 * (prow[col] or 0), 1)
+                result.append(blended)
+            else:
+                result.append(row)
+        return result
     return _cached("player_season_stats", fetch)
 
 
@@ -125,24 +153,48 @@ def get_todays_games():
 def get_team_last_n_games(team_id: int, n: int = 10):
     key = f"team_gamelog_{team_id}"
     def fetch():
-        resp = teamgamelog.TeamGameLog(
+        playoff_resp = teamgamelog.TeamGameLog(
+            team_id=team_id,
+            season=CURRENT_SEASON,
+            season_type_all_star="Playoffs",
+            timeout=30,
+        )
+        playoff_games = playoff_resp.get_data_frames()[0].to_dict(orient="records")
+
+        if len(playoff_games) >= n:
+            return playoff_games[:n]
+
+        time.sleep(0.3)
+        reg_resp = teamgamelog.TeamGameLog(
             team_id=team_id,
             season=CURRENT_SEASON,
             timeout=30,
         )
-        df = resp.get_data_frames()[0]
-        return df.head(n).to_dict(orient="records")
+        reg_games = reg_resp.get_data_frames()[0].to_dict(orient="records")
+        return (playoff_games + reg_games[:n - len(playoff_games)])[:n]
     return _cached(key, fetch)
 
 
 def get_player_last_n_games(player_id: int, n: int = 10):
     key = f"player_gamelog_{player_id}"
     def fetch():
-        resp = playergamelog.PlayerGameLog(
+        playoff_resp = playergamelog.PlayerGameLog(
+            player_id=player_id,
+            season=CURRENT_SEASON,
+            season_type_all_star="Playoffs",
+            timeout=30,
+        )
+        playoff_games = playoff_resp.get_data_frames()[0].to_dict(orient="records")
+
+        if len(playoff_games) >= n:
+            return playoff_games[:n]
+
+        time.sleep(0.3)
+        reg_resp = playergamelog.PlayerGameLog(
             player_id=player_id,
             season=CURRENT_SEASON,
             timeout=30,
         )
-        df = resp.get_data_frames()[0]
-        return df.head(n).to_dict(orient="records")
+        reg_games = reg_resp.get_data_frames()[0].to_dict(orient="records")
+        return (playoff_games + reg_games[:n - len(playoff_games)])[:n]
     return _cached(key, fetch)
