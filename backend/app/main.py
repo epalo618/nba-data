@@ -30,3 +30,15 @@ def health():
 def debug_games():
     from app.services import nba_service
     return nba_service.get_todays_games()
+
+
+@app.get("/api/debug/odds")
+async def debug_odds():
+    from app.services import odds_service
+    events = await odds_service.get_nba_events()
+    if not events:
+        return {"error": "no events returned — check ODDS_API_KEY", "events": []}
+    event = events[0]
+    bookmakers = await odds_service.get_player_props(event["id"])
+    props = odds_service.parse_player_props(bookmakers)
+    return {"event": event.get("id"), "bookmaker_count": len(bookmakers), "sample_props": dict(list(props.items())[:3])}
