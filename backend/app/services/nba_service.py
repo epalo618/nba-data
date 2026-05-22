@@ -9,7 +9,7 @@ from nba_api.stats.endpoints import (
     playergamelog,
 )
 
-CURRENT_SEASON = "2024-25"
+CURRENT_SEASON = "2025-26"
 _cache: dict = {}
 CACHE_TTL = 3600  # 1 hour
 
