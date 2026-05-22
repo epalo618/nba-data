@@ -94,7 +94,7 @@ def get_best_bets():
                 )[:6]
 
                 for p in team_players:
-                    projs = project_player_stats(p["PLAYER_ID"], opp_id, ["PTS", "REB", "AST"])
+                    projs = project_player_stats(p["PLAYER_ID"], opp_id, ["PTS", "REB", "AST", "FG3M", "FG3_PCT"])
                     for proj in projs:
                         proj["game"] = f"{game.get('HOME_TEAM_CITY', '')} vs {game.get('VISITOR_TEAM_CITY', '')}"
                         best_bets.append(proj)
