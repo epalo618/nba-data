@@ -107,7 +107,7 @@ def get_player_season_stats():
         if not playoff_records:
             return reg_records
 
-        blend_cols = ["PTS", "REB", "AST", "STL", "BLK", "MIN", "FG3M", "FG3_PCT"]
+        blend_cols = ["PTS", "REB", "AST", "STL", "BLK", "MIN", "FG3M"]
         playoff_map = {r["PLAYER_ID"]: r for r in playoff_records}
 
         result = []

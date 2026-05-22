@@ -223,9 +223,8 @@ def project_player_stats(player_id: int, opponent_team_id: int, stat_cols: list[
         "STL": "STL",
         "BLK": "BLK",
         "FG3M": "FG3M",
-        "FG3_PCT": "FG3_PCT",
     }
-    pct_stats = {"FG3_PCT"}
+    pct_stats: set = set()
 
     for stat in stat_cols:
         col = stat_map.get(stat, stat)
@@ -255,7 +254,7 @@ def project_player_stats(player_id: int, opponent_team_id: int, stat_cols: list[
             "player_id": player_id,
             "player_name": player.get("PLAYER_NAME", ""),
             "team_abbreviation": player.get("TEAM_ABBREVIATION", ""),
-            "stat": "3P%" if stat == "FG3_PCT" else stat,
+            "stat": stat,
             "season_avg": round(season_avg, 1),
             "reg_season_avg": reg_avg,
             "playoff_avg": playoff_avg,
