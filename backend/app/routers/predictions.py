@@ -103,21 +103,40 @@ async def get_best_bets():
                 )[:6]
 
                 for p in team_players:
-                    projs = project_player_stats(p["PLAYER_ID"], opp_id, ["PTS", "REB", "AST", "FG3M"])
+                    projs = project_player_stats(p["PLAYER_ID"], opp_id, ["PTS", "REB", "AST", "FG3M", "STL", "BLK"])
                     player_props = prop_lines.get(p.get("PLAYER_NAME", ""), {})
                     for proj in projs:
                         prop = player_props.get(proj["stat"], {})
-                        proj["line"] = prop.get("line")
+                        line = prop.get("line")
+                        if line is None:
+                            continue
+                        gap = abs(proj["projection"] - line)
+                        if gap / max(line, 0.1) < 0.08:
+                            continue
+                        proj["line"] = line
                         proj["line_source"] = prop.get("book")
+                        proj["gap"] = round(gap, 2)
                         proj["game"] = f"{game.get('HOME_TEAM_CITY', '')} vs {game.get('VISITOR_TEAM_CITY', '')}"
                         best_bets.append(proj)
 
-        def sort_key(x):
-            has_line = x["line"] is not None
-            gap = abs(x["projection"] - x["line"]) if has_line else 0
-            return (x["stat"], not has_line, -gap)
+        # Group by stat, sort each group by gap desc, round-robin to mix stat types
+        from collections import defaultdict
+        by_stat: dict = defaultdict(list)
+        for bet in best_bets:
+            by_stat[bet["stat"]].append(bet)
+        for stat in by_stat:
+            by_stat[stat].sort(key=lambda x: -x["gap"])
 
-        best_bets.sort(key=sort_key)
-        return best_bets
+        mixed = []
+        stat_order = ["PTS", "REB", "AST", "FG3M", "STL", "BLK"]
+        queues = [by_stat[s] for s in stat_order if s in by_stat]
+        i = 0
+        while len(mixed) < 20 and any(queues):
+            q = queues[i % len(queues)]
+            if q:
+                mixed.append(q.pop(0))
+            i += 1
+
+        return mixed
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
