@@ -16,8 +16,17 @@ export default function WinProbBar({ homeTeam, awayTeam, homeProb, awayProb }: P
         <span className="font-semibold text-white">{homeTeam} <span className="text-brand">{homePct}%</span></span>
       </div>
       <div className="h-3 flex rounded-full overflow-hidden">
-        <div className="bg-brand transition-all" style={{ width: `${awayPct}%` }} />
-        <div className="bg-surface-border flex-1" />
+        {awayProb >= homeProb ? (
+          <>
+            <div className="bg-brand transition-all" style={{ width: `${awayPct}%` }} />
+            <div className="bg-surface-border flex-1" />
+          </>
+        ) : (
+          <>
+            <div className="bg-surface-border flex-1" />
+            <div className="bg-brand transition-all" style={{ width: `${homePct}%` }} />
+          </>
+        )}
       </div>
     </div>
   )
