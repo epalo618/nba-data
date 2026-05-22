@@ -112,7 +112,12 @@ async def get_best_bets():
                         proj["game"] = f"{game.get('HOME_TEAM_CITY', '')} vs {game.get('VISITOR_TEAM_CITY', '')}"
                         best_bets.append(proj)
 
-        best_bets.sort(key=lambda x: (x["stat"], -abs(x["projection"] - x["season_avg"])))
+        def sort_key(x):
+            has_line = x["line"] is not None
+            gap = abs(x["projection"] - x["line"]) if has_line else 0
+            return (x["stat"], not has_line, -gap)
+
+        best_bets.sort(key=sort_key)
         return best_bets
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
