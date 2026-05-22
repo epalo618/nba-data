@@ -147,7 +147,7 @@ export default function Dashboard() {
               <span>Reg Avg</span>
               <span className="text-yellow-600">Post Avg</span>
               <span>Projection</span>
-              <span className="col-span-2">Line</span>
+              <span className="col-span-2">Tot Avg</span>
               <span>Signal</span>
             </div>
             {((bestBets as any[]) ?? []).slice(0, 15).map((bet: any, i: number) => (
@@ -158,12 +158,12 @@ export default function Dashboard() {
                 <span className="text-yellow-400">{bet.playoff_avg ?? '—'}</span>
                 <span className="text-white font-bold">{bet.projection}</span>
                 <span className="text-gray-400 col-span-2">
-                  {bet.line != null ? `${bet.line} (${bet.line_source})` : '—'}
+                  {bet.season_avg ?? '—'}
                 </span>
                 <span className={clsx('font-bold text-xs',
-                  bet.projection > (bet.line ?? bet.season_avg) ? 'text-green-400' : 'text-red-400'
+                  bet.projection > bet.season_avg ? 'text-green-400' : 'text-red-400'
                 )}>
-                  {bet.projection > (bet.line ?? bet.season_avg) ? '↑ OVER' : '↓ UNDER'}
+                  {bet.projection > bet.season_avg ? '↑ OVER' : '↓ UNDER'}
                 </span>
               </div>
             ))}

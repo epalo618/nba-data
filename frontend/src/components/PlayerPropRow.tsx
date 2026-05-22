@@ -16,8 +16,7 @@ interface Projection {
 }
 
 export default function PlayerPropRow({ proj }: { proj: Projection }) {
-  const baseline = proj.line ?? proj.season_avg
-  const diff = proj.projection - baseline
+  const diff = proj.projection - proj.season_avg
   const rec = proj.recommendation ?? (diff > 0 ? 'OVER' : 'UNDER')
 
   return (
@@ -30,7 +29,7 @@ export default function PlayerPropRow({ proj }: { proj: Projection }) {
       <span className="text-gray-300">{proj.last10_avg}</span>
       <span className="text-gray-300">{proj.last5_avg}</span>
       <span className="font-bold text-white">{proj.projection}</span>
-      <span className="text-gray-500">{proj.line ?? '—'}</span>
+      <span className="text-gray-500">{proj.season_avg}</span>
       <div className="flex items-center gap-2">
         {rec && (
           <span className={clsx('font-bold text-xs', rec === 'OVER' ? 'text-green-400' : rec === 'UNDER' ? 'text-red-400' : 'text-gray-400')}>

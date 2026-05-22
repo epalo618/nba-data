@@ -45,13 +45,12 @@ export default function Predictions() {
                   <span className="text-right text-yellow-600">Post Avg</span>
                   <span className="text-right">L10</span>
                   <span className="text-right">Projection</span>
-                  <span className="text-right">Line</span>
+                  <span className="text-right">Tot Avg</span>
                   <span className="text-right">Signal</span>
                 </div>
                 {catBets.slice(0, 10).map((bet: any, i: number) => {
-                  const baseline = bet.line ?? bet.season_avg
-                  const isOver = bet.projection > baseline
-                  const diffPct = Math.abs((bet.projection - baseline) / Math.max(baseline, 1)) * 100
+                  const isOver = bet.projection > bet.season_avg
+                  const diffPct = Math.abs((bet.projection - bet.season_avg) / Math.max(bet.season_avg, 1)) * 100
                   const conf = diffPct > 15 ? 'STRONG' : diffPct > 10 ? 'HIGH' : diffPct > 5 ? 'MED' : 'LOW'
                   return (
                     <div key={i} className="grid grid-cols-9 gap-2 px-4 py-3 border-b border-surface-border hover:bg-surface-hover items-center">
@@ -61,7 +60,7 @@ export default function Predictions() {
                       <span className="text-right text-yellow-400 text-sm">{bet.playoff_avg ?? '—'}</span>
                       <span className="text-right text-gray-400 text-sm">{bet.last10_avg}</span>
                       <span className="text-right text-white font-bold">{bet.projection}</span>
-                      <span className="text-right text-gray-500 text-sm">{bet.line ?? '—'}</span>
+                      <span className="text-right text-gray-500 text-sm">{bet.season_avg ?? '—'}</span>
                       <div className="flex justify-end items-center gap-2">
                         <span className={clsx('text-xs font-bold', isOver ? 'text-green-400' : 'text-red-400')}>
                           {isOver ? '↑ OVER' : '↓ UNDER'}
