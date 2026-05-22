@@ -75,20 +75,20 @@ export default function Dashboard() {
             >
               <div className="flex justify-between items-center mb-4">
                 <div>
-                  <div className="text-white font-semibold">{game.home_team_name}</div>
-                  <div className="text-gray-500 text-xs">HOME</div>
+                  <div className="text-white font-semibold">{game.away_team_name}</div>
+                  <div className="text-gray-500 text-xs">AWAY</div>
                 </div>
                 <div className="text-center">
                   <div className="text-brand font-bold text-lg">vs</div>
                   {game.h2h_games_played > 0 && (
                     <div className="text-xs text-gray-500 mt-0.5">
-                      H2H {game.h2h_home_wins}-{game.h2h_away_wins}
+                      H2H {game.h2h_away_wins}-{game.h2h_home_wins}
                     </div>
                   )}
                 </div>
                 <div className="text-right">
-                  <div className="text-white font-semibold">{game.away_team_name}</div>
-                  <div className="text-gray-500 text-xs">AWAY</div>
+                  <div className="text-white font-semibold">{game.home_team_name}</div>
+                  <div className="text-gray-500 text-xs">HOME</div>
                 </div>
               </div>
 
