@@ -309,7 +309,9 @@ def get_game_boxscore(game_id: str) -> list[dict]:
 
 def get_player_stats_for_date(date_str: str) -> list[dict]:
     """All player game stats for a specific date (single API call, playoffs first)."""
+    last_error = None
     def fetch():
+        nonlocal last_error
         for season_type in ["Playoffs", "Regular Season"]:
             try:
                 resp = leaguegamelog.LeagueGameLog(
@@ -323,7 +325,9 @@ def get_player_stats_for_date(date_str: str) -> list[dict]:
                 records = resp.get_data_frames()[0].to_dict(orient="records")
                 if records:
                     return records
-            except Exception:
-                pass
+            except Exception as e:
+                last_error = e
+        if last_error:
+            raise last_error
         return []
     return _cached(f"player_stats_date_{date_str}", fetch)
