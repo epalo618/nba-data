@@ -29,23 +29,16 @@ export default function Dashboard() {
     }
   }, [recordData])
 
+  // Sync yesterday's + today's completed games into the record on load
   useEffect(() => {
-    if (!games.length) return
-    const submitCompleted = async () => {
-      for (const game of games) {
-        const gid = game.GAME_ID
-        if (!gid || game.GAME_STATUS_ID !== 3) continue
-        if (!game.HOME_SCORE || !game.VISITOR_SCORE || game.HOME_SCORE === game.VISITOR_SCORE) continue
-        if (!game.favored_team) continue
-        const actualWinner = game.HOME_SCORE > game.VISITOR_SCORE ? game.home_team_name : game.away_team_name
-        try {
-          await recordApi.submit(gid, game.favored_team, actualWinner)
-        } catch {}
-      }
-      refetchRecord?.()
+    const sync = async () => {
+      try {
+        await recordApi.sync()
+        refetchRecord?.()
+      } catch {}
     }
-    submitCompleted()
-  }, [games])
+    sync()
+  }, [])
 
   const total = record.wins + record.losses
 

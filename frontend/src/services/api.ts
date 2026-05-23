@@ -32,4 +32,5 @@ export const recordApi = {
   get: () => api.get('/record'),
   submit: (game_id: string, predicted_winner: string, actual_winner: string) =>
     api.post('/record/submit', { game_id, predicted_winner, actual_winner }),
+  sync: () => api.post('/record/sync', {}),
 }

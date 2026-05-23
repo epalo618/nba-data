@@ -132,58 +132,65 @@ def get_player_season_stats():
     return _cached("player_season_stats", fetch)
 
 
+def _parse_scoreboard(date_str: str) -> dict:
+    """Fetch and parse scoreboard for a given YYYY-MM-DD date string."""
+    resp = scoreboardv3.ScoreboardV3(game_date=date_str, timeout=30)
+    dfs = resp.get_data_frames()
+    games_df = dfs[1]
+    teams_df = dfs[2]
+
+    games = []
+    for _, game_row in games_df.iterrows():
+        game_id = game_row["gameId"]
+        game_code = game_row.get("gameCode", "")
+        code_part = game_code.split("/")[-1] if "/" in game_code else ""
+        away_tricode = code_part[:3]
+        home_tricode = code_part[3:]
+
+        team_rows = teams_df[teams_df["gameId"] == game_id]
+        home_row = team_rows[team_rows["teamTricode"] == home_tricode]
+        away_row = team_rows[team_rows["teamTricode"] == away_tricode]
+
+        if home_row.empty or away_row.empty:
+            rows = team_rows.to_dict(orient="records")
+            home_data = rows[0] if rows else {}
+            away_data = rows[1] if len(rows) > 1 else {}
+        else:
+            home_data = home_row.iloc[0].to_dict()
+            away_data = away_row.iloc[0].to_dict()
+
+        games.append({
+            "GAME_ID": game_id,
+            "GAME_STATUS_TEXT": game_row.get("gameStatusText", ""),
+            "GAME_STATUS_ID": game_row.get("gameStatus", 1),
+            "GAME_TIME_UTC": game_row.get("gameTimeUTC", ""),
+            "SERIES_GAME_NUMBER": game_row.get("seriesGameNumber", ""),
+            "GAME_LABEL": game_row.get("gameLabel", ""),
+            "SERIES_TEXT": game_row.get("seriesText", ""),
+            "HOME_TEAM_ID": home_data.get("teamId"),
+            "HOME_TEAM_CITY": home_data.get("teamCity", ""),
+            "HOME_TEAM_NAME": home_data.get("teamName", ""),
+            "HOME_TEAM_TRICODE": home_data.get("teamTricode", ""),
+            "HOME_SCORE": home_data.get("score", 0),
+            "VISITOR_TEAM_ID": away_data.get("teamId"),
+            "VISITOR_TEAM_CITY": away_data.get("teamCity", ""),
+            "VISITOR_TEAM_NAME": away_data.get("teamName", ""),
+            "VISITOR_TEAM_TRICODE": away_data.get("teamTricode", ""),
+            "VISITOR_SCORE": away_data.get("score", 0),
+        })
+
+    return {"games": games, "line_score": []}
+
+
+def get_games_for_date(date_str: str) -> dict:
+    return _cached(f"games_{date_str}", lambda: _parse_scoreboard(date_str))
+
+
 def get_todays_games():
     def fetch():
         # Use Eastern time so the date doesn't flip at 8 PM EST (midnight UTC)
         today = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
-        resp = scoreboardv3.ScoreboardV3(game_date=today, timeout=30)
-        dfs = resp.get_data_frames()
-        games_df = dfs[1]   # one row per game
-        teams_df = dfs[2]   # two rows per game (home first, away second)
-
-        games = []
-        for _, game_row in games_df.iterrows():
-            game_id = game_row["gameId"]
-            game_code = game_row.get("gameCode", "")
-            # gameCode format: DATE/AWAYTEAMHOMETEAM (e.g. 20260522/OKCSAS)
-            code_part = game_code.split("/")[-1] if "/" in game_code else ""
-            away_tricode = code_part[:3]
-            home_tricode = code_part[3:]
-
-            team_rows = teams_df[teams_df["gameId"] == game_id]
-            home_row = team_rows[team_rows["teamTricode"] == home_tricode]
-            away_row = team_rows[team_rows["teamTricode"] == away_tricode]
-
-            if home_row.empty or away_row.empty:
-                # fallback: first row = home, second = away
-                rows = team_rows.to_dict(orient="records")
-                home_data = rows[0] if rows else {}
-                away_data = rows[1] if len(rows) > 1 else {}
-            else:
-                home_data = home_row.iloc[0].to_dict()
-                away_data = away_row.iloc[0].to_dict()
-
-            games.append({
-                "GAME_ID": game_id,
-                "GAME_STATUS_TEXT": game_row.get("gameStatusText", ""),
-                "GAME_STATUS_ID": game_row.get("gameStatus", 1),
-                "GAME_TIME_UTC": game_row.get("gameTimeUTC", ""),
-                "SERIES_GAME_NUMBER": game_row.get("seriesGameNumber", ""),
-                "GAME_LABEL": game_row.get("gameLabel", ""),
-                "SERIES_TEXT": game_row.get("seriesText", ""),
-                "HOME_TEAM_ID": home_data.get("teamId"),
-                "HOME_TEAM_CITY": home_data.get("teamCity", ""),
-                "HOME_TEAM_NAME": home_data.get("teamName", ""),
-                "HOME_TEAM_TRICODE": home_data.get("teamTricode", ""),
-                "HOME_SCORE": home_data.get("score", 0),
-                "VISITOR_TEAM_ID": away_data.get("teamId"),
-                "VISITOR_TEAM_CITY": away_data.get("teamCity", ""),
-                "VISITOR_TEAM_NAME": away_data.get("teamName", ""),
-                "VISITOR_TEAM_TRICODE": away_data.get("teamTricode", ""),
-                "VISITOR_SCORE": away_data.get("score", 0),
-            })
-
-        return {"games": games, "line_score": []}
+        return _parse_scoreboard(today)
 
     # 60-second TTL so live scores refresh; all other caches stay at 1 hour
     key = "todays_games"
