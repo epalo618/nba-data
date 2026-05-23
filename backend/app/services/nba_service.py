@@ -300,3 +300,25 @@ def get_game_boxscore(game_id: str) -> list[dict]:
         df = resp.get_data_frames()[0]  # player stats
         return df.to_dict(orient="records")
     return _cached(f"boxscore_{game_id}", fetch)
+
+
+def get_player_stats_for_date(date_str: str) -> list[dict]:
+    """All player game stats for a specific date (single API call, playoffs first)."""
+    def fetch():
+        for season_type in ["Playoffs", "Regular Season"]:
+            try:
+                resp = leaguegamelog.LeagueGameLog(
+                    season=CURRENT_SEASON,
+                    season_type_all_star=season_type,
+                    player_or_team_abbreviation="P",
+                    date_from_nullable=date_str,
+                    date_to_nullable=date_str,
+                    timeout=60,
+                )
+                records = resp.get_data_frames()[0].to_dict(orient="records")
+                if records:
+                    return records
+            except Exception:
+                pass
+        return []
+    return _cached(f"player_stats_date_{date_str}", fetch)

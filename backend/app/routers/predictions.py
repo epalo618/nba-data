@@ -136,33 +136,44 @@ def get_yesterday_results():
         eastern = ZoneInfo("America/New_York")
         yesterday = (datetime.now(eastern) - timedelta(days=1)).strftime("%Y-%m-%d")
 
-        data = nba_service.get_games_for_date(yesterday)
-        games = [g for g in data.get("games", []) if g.get("GAME_STATUS_ID") == 3]
+        # Single API call for all player stats on that date
+        player_game_rows = nba_service.get_player_stats_for_date(yesterday)
+        if not player_game_rows:
+            return []
 
-        all_player_stats = nba_service.get_player_season_stats()
-        player_season_map = {p["PLAYER_ID"]: p for p in all_player_stats}
+        # Build game metadata map from yesterday's scoreboard
+        data = nba_service.get_games_for_date(yesterday)
+        game_meta: dict = {}
+        for g in data.get("games", []):
+            gid = g.get("GAME_ID")
+            if gid:
+                game_meta[gid] = {
+                    "home_id": g.get("HOME_TEAM_ID"),
+                    "away_id": g.get("VISITOR_TEAM_ID"),
+                    "label": f"{g.get('VISITOR_TEAM_CITY', '')} @ {g.get('HOME_TEAM_CITY', '')}",
+                }
+
+        # Group player rows by game
+        from collections import defaultdict
+        by_game: dict = defaultdict(list)
+        for row in player_game_rows:
+            gid = row.get("GAME_ID")
+            if gid:
+                by_game[gid].append(row)
 
         results = []
-        for game in games:
-            home_id = game.get("HOME_TEAM_ID")
-            away_id = game.get("VISITOR_TEAM_ID")
-            game_id = game.get("GAME_ID")
-            if not home_id or not away_id or not game_id:
-                continue
+        for game_id, rows in by_game.items():
+            meta = game_meta.get(game_id, {})
+            home_id = meta.get("home_id")
+            away_id = meta.get("away_id")
+            game_label = meta.get("label", game_id)
 
-            game_label = f"{game.get('VISITOR_TEAM_CITY', '')} @ {game.get('HOME_TEAM_CITY', '')}"
-
-            try:
-                boxscore = nba_service.get_game_boxscore(game_id)
-            except Exception as box_err:
-                raise HTTPException(status_code=500, detail=f"Boxscore fetch failed for {game_id}: {box_err}")
-
-            for player_row in boxscore:
+            for player_row in rows:
                 pid = player_row.get("PLAYER_ID")
-                if not pid or pid not in player_season_map:
+                if not pid:
                     continue
 
-                # Parse minutes — skip players with under 10 mins
+                # Skip players with under 10 minutes
                 min_raw = player_row.get("MIN") or "0"
                 try:
                     mins = float(str(min_raw).split(":")[0])
@@ -173,6 +184,8 @@ def get_yesterday_results():
 
                 team_id = player_row.get("TEAM_ID")
                 opp_id = away_id if team_id == home_id else home_id
+                if not opp_id:
+                    continue
 
                 try:
                     projs = project_player_stats(pid, opp_id, PROP_STATS)

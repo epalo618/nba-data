@@ -19,18 +19,11 @@ def _prewarm_caches():
         nba_service._get_all_game_scores()
         nba_service.get_player_season_stats()
 
-        # Pre-warm yesterday's scoreboard + boxscores for the Yesterday page
+        # Pre-warm yesterday's data for the Yesterday page (single API call)
         eastern = ZoneInfo("America/New_York")
         yesterday = (datetime.now(eastern) - timedelta(days=1)).strftime("%Y-%m-%d")
-        yesterday_data = nba_service.get_games_for_date(yesterday)
-        for game in yesterday_data.get("games", []):
-            if game.get("GAME_STATUS_ID") == 3:
-                gid = game.get("GAME_ID")
-                if gid:
-                    try:
-                        nba_service.get_game_boxscore(gid)
-                    except Exception:
-                        pass
+        nba_service.get_games_for_date(yesterday)
+        nba_service.get_player_stats_for_date(yesterday)
     except Exception:
         pass  # don't crash startup if NBA API is down
 
