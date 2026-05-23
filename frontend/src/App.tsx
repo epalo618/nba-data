@@ -6,6 +6,7 @@ import Players from './pages/Players'
 import Games from './pages/Games'
 import GameMatchup from './pages/GameMatchup'
 import Predictions from './pages/Predictions'
+import Yesterday from './pages/Yesterday'
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
             <Route path="/games" element={<Games />} />
             <Route path="/games/:homeId/vs/:awayId" element={<GameMatchup />} />
             <Route path="/predictions" element={<Predictions />} />
+            <Route path="/yesterday" element={<Yesterday />} />
           </Routes>
         </main>
       </div>

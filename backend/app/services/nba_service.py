@@ -9,6 +9,7 @@ from nba_api.stats.endpoints import (
     scoreboardv3,
     teamgamelog,
     playergamelog,
+    boxscoretraditionalv2,
 )
 
 CURRENT_SEASON = "2025-26"
@@ -291,3 +292,11 @@ def get_player_last_n_games(player_id: int, n: int = 10):
         reg_games = reg_resp.get_data_frames()[0].to_dict(orient="records")
         return (playoff_games + reg_games[:n - len(playoff_games)])[:n]
     return _cached(key, fetch)
+
+
+def get_game_boxscore(game_id: str) -> list[dict]:
+    def fetch():
+        resp = boxscoretraditionalv2.BoxScoreTraditionalV2(game_id=game_id, timeout=60)
+        df = resp.get_data_frames()[0]  # player stats
+        return df.to_dict(orient="records")
+    return _cached(f"boxscore_{game_id}", fetch)

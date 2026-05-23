@@ -26,6 +26,7 @@ export const predictionsApi = {
   getGamePlayerProjections: (homeId: number, awayId: number, topN = 8) =>
     api.get(`/predictions/game/${homeId}/vs/${awayId}/players?top_n=${topN}`),
   getBestBets: () => api.get('/predictions/best-bets'),
+  getYesterday: () => api.get('/predictions/yesterday'),
 }
 
 export const recordApi = {
