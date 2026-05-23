@@ -127,8 +127,8 @@ def calculate_win_probability(
             f"offense ({dog_ortg:.1f} ORtg) — a {abs(def_adv):.1f} pt suppression edge."
         )
 
-    # Recent form reason
-    form_gap = abs(fav_wins - dog_wins)
+    # Recent form reason — only mention if favored team actually has better recent record
+    form_gap = fav_wins - dog_wins
     if form_gap >= 3:
         reasons.append(
             f"{favored} is playing better basketball lately, going {fav_wins}-{10 - fav_wins} "
@@ -138,6 +138,11 @@ def calculate_win_probability(
         reasons.append(
             f"Recent form favors {favored} ({fav_wins}-{10 - fav_wins} L10) "
             f"over {underdog} ({dog_wins}-{10 - dog_wins} L10)."
+        )
+    elif form_gap <= -3:
+        reasons.append(
+            f"{underdog} has better recent form ({dog_wins}-{10 - dog_wins} L10 vs {favored}'s "
+            f"{fav_wins}-{10 - fav_wins}), but {favored}'s overall efficiency still projects a win."
         )
 
     # Scoring output
