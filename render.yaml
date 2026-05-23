@@ -8,3 +8,9 @@ services:
     envVars:
       - key: ALLOWED_ORIGINS
         value: "*"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: ODDS_API_KEY
+        sync: false

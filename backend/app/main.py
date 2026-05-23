@@ -1,9 +1,30 @@
 import os
+import json
 import asyncio
 from contextlib import asynccontextmanager
+import numpy as np
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from app.routers import teams, players, games, predictions, record
+
+
+class _NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.bool_):
+            return bool(obj)
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
+
+
+class NumpyJSONResponse(JSONResponse):
+    def render(self, content) -> bytes:
+        return json.dumps(content, cls=_NumpyEncoder, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
 
 
 def _prewarm_caches():
@@ -35,7 +56,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="NBA Analytics API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="NBA Analytics API", version="1.0.0", lifespan=lifespan, default_response_class=NumpyJSONResponse)
 
 allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 

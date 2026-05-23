@@ -266,17 +266,17 @@ def project_player_stats(player_id: int, opponent_team_id: int, stat_cols: list[
             )
 
         results.append({
-            "player_id": player_id,
-            "player_name": player.get("PLAYER_NAME", ""),
-            "team_abbreviation": player.get("TEAM_ABBREVIATION", ""),
+            "player_id": int(player_id),
+            "player_name": str(player.get("PLAYER_NAME", "")),
+            "team_abbreviation": str(player.get("TEAM_ABBREVIATION", "")),
             "stat": stat,
-            "season_avg": round(season_avg, 1),
-            "reg_season_avg": reg_avg,
-            "playoff_avg": playoff_avg,
-            "last5_avg": l5,
-            "last10_avg": l10,
-            "opponent_rank": opp_rank,
-            "projection": projection,
+            "season_avg": float(round(season_avg, 1)),
+            "reg_season_avg": float(reg_avg),
+            "playoff_avg": float(playoff_avg) if playoff_avg is not None else None,
+            "last5_avg": float(l5),
+            "last10_avg": float(l10),
+            "opponent_rank": int(opp_rank),
+            "projection": float(projection),
         })
 
     return results

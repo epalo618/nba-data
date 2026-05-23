@@ -1,4 +1,7 @@
+import json
+import numpy as np
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import Response
 from app.services.predictions_service import (
     project_player_stats,
     get_prop_recommendation,
@@ -8,6 +11,16 @@ from app.services.predictions_service import (
 from app.services import nba_service
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+
+
+def _numpy_default(obj):
+    if isinstance(obj, np.bool_):
+        return bool(obj)
+    if isinstance(obj, np.integer):
+        return int(obj)
+    if isinstance(obj, np.floating):
+        return float(obj)
+    return str(obj)
 
 router = APIRouter()
 
@@ -202,11 +215,11 @@ def get_yesterday_results():
                     except Exception:
                         continue
 
-                    season_avg = proj["season_avg"]
-                    projection = proj["projection"]
-                    predicted_over = projection >= season_avg
-                    went_over = actual_val >= season_avg
-                    correct = predicted_over == went_over
+                    season_avg = float(proj["season_avg"])
+                    projection = float(proj["projection"])
+                    predicted_over = bool(projection >= season_avg)
+                    went_over = bool(actual_val >= season_avg)
+                    correct = bool(predicted_over == went_over)
 
                     results.append({
                         "game": game_label,
@@ -221,6 +234,9 @@ def get_yesterday_results():
                         "correct": correct,
                     })
 
-        return results
+        return Response(
+            content=json.dumps(results, default=_numpy_default),
+            media_type="application/json",
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

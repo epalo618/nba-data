@@ -184,7 +184,12 @@ def _parse_scoreboard(date_str: str) -> dict:
 
 
 def get_games_for_date(date_str: str) -> dict:
-    return _cached(f"games_{date_str}", lambda: _parse_scoreboard(date_str))
+    def fetch():
+        try:
+            return _parse_scoreboard(date_str)
+        except Exception:
+            return {"games": [], "line_score": []}
+    return _cached(f"games_{date_str}", fetch)
 
 
 def get_todays_games():
