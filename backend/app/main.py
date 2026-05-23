@@ -10,11 +10,27 @@ def _prewarm_caches():
     """Pre-warm heavy caches on startup so first user request is fast."""
     try:
         from app.services import nba_service
+        from datetime import datetime, timedelta
+        from zoneinfo import ZoneInfo
+
         nba_service.get_team_season_stats()
         nba_service.get_team_advanced_stats()
         nba_service.get_todays_games()
         nba_service._get_all_game_scores()
         nba_service.get_player_season_stats()
+
+        # Pre-warm yesterday's scoreboard + boxscores for the Yesterday page
+        eastern = ZoneInfo("America/New_York")
+        yesterday = (datetime.now(eastern) - timedelta(days=1)).strftime("%Y-%m-%d")
+        yesterday_data = nba_service.get_games_for_date(yesterday)
+        for game in yesterday_data.get("games", []):
+            if game.get("GAME_STATUS_ID") == 3:
+                gid = game.get("GAME_ID")
+                if gid:
+                    try:
+                        nba_service.get_game_boxscore(gid)
+                    except Exception:
+                        pass
     except Exception:
         pass  # don't crash startup if NBA API is down
 

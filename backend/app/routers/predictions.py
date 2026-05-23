@@ -154,8 +154,8 @@ def get_yesterday_results():
 
             try:
                 boxscore = nba_service.get_game_boxscore(game_id)
-            except Exception:
-                continue
+            except Exception as box_err:
+                raise HTTPException(status_code=500, detail=f"Boxscore fetch failed for {game_id}: {box_err}")
 
             for player_row in boxscore:
                 pid = player_row.get("PLAYER_ID")

@@ -10,7 +10,7 @@ const STAT_LABEL: Record<string, string> = {
 }
 
 export default function Yesterday() {
-  const { data, loading } = useApi(() => predictionsApi.getYesterday())
+  const { data, loading, error } = useApi(() => predictionsApi.getYesterday())
   const rows = (data as any[]) ?? []
 
   const correct = rows.filter(r => r.correct).length
@@ -32,6 +32,10 @@ export default function Yesterday() {
 
       {loading ? (
         <LoadingSpinner label="Loading yesterday's results..." />
+      ) : error ? (
+        <div className="bg-surface-card border border-red-900 rounded-xl p-8 text-center text-red-400">
+          {error}
+        </div>
       ) : rows.length === 0 ? (
         <div className="bg-surface-card border border-surface-border rounded-xl p-8 text-center text-gray-500">
           No completed games found for yesterday.
