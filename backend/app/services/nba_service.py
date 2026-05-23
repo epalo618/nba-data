@@ -1,6 +1,7 @@
 import time
 from nba_api.stats.static import teams as nba_teams_static, players as nba_players_static
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 from nba_api.stats.endpoints import (
     leaguedashteamstats,
     leaguedashplayerstats,
@@ -133,7 +134,8 @@ def get_player_season_stats():
 
 def get_todays_games():
     def fetch():
-        today = date.today().strftime("%Y-%m-%d")
+        # Use Eastern time so the date doesn't flip at 8 PM EST (midnight UTC)
+        today = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
         resp = scoreboardv3.ScoreboardV3(game_date=today, timeout=30)
         dfs = resp.get_data_frames()
         games_df = dfs[1]   # one row per game
@@ -182,7 +184,15 @@ def get_todays_games():
             })
 
         return {"games": games, "line_score": []}
-    return _cached("todays_games", fetch)
+
+    # 60-second TTL so live scores refresh; all other caches stay at 1 hour
+    key = "todays_games"
+    now = time.time()
+    if key in _cache and now - _cache[key]["ts"] < 60:
+        return _cache[key]["data"]
+    data = fetch()
+    _cache[key] = {"data": data, "ts": now}
+    return data
 
 
 def get_team_last_n_games(team_id: int, n: int = 10):
