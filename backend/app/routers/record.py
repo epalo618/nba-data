@@ -42,6 +42,57 @@ def submit_result(result: GameResult):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/debug")
+def debug_sync():
+    """Show what the sync endpoint would submit, without writing anything."""
+    try:
+        all_teams = {t["id"]: t for t in nba_service.get_all_teams()}
+        eastern = ZoneInfo("America/New_York")
+        today_str = datetime.now(eastern).strftime("%Y-%m-%d")
+        yesterday_str = (datetime.now(eastern) - timedelta(days=1)).strftime("%Y-%m-%d")
+
+        output = []
+        for date_str in [yesterday_str, today_str]:
+            try:
+                data = nba_service.get_games_for_date(date_str)
+                games = data.get("games", [])
+                for game in games:
+                    home_id = game.get("HOME_TEAM_ID")
+                    away_id = game.get("VISITOR_TEAM_ID")
+                    home_info = all_teams.get(home_id, {})
+                    away_info = all_teams.get(away_id, {})
+                    home_name = home_info.get("full_name", "?")
+                    away_name = away_info.get("full_name", "?")
+                    entry = {
+                        "date": date_str,
+                        "game_id": game.get("GAME_ID"),
+                        "status_id": game.get("GAME_STATUS_ID"),
+                        "status_text": game.get("GAME_STATUS_TEXT"),
+                        "home": home_name,
+                        "away": away_name,
+                        "home_score": game.get("HOME_SCORE"),
+                        "away_score": game.get("VISITOR_SCORE"),
+                    }
+                    if game.get("GAME_STATUS_ID") == 3 and home_id and away_id:
+                        try:
+                            wp = calculate_win_probability(home_id, away_id, home_name, away_name)
+                            entry["predicted_winner"] = wp.get("favored_team")
+                            hs = game.get("HOME_SCORE", 0)
+                            vs = game.get("VISITOR_SCORE", 0)
+                            if hs and vs and hs != vs:
+                                entry["actual_winner"] = home_name if hs > vs else away_name
+                                entry["correct"] = entry["predicted_winner"] == entry["actual_winner"]
+                        except Exception as ex:
+                            entry["wp_error"] = str(ex)
+                    output.append(entry)
+            except Exception as ex:
+                output.append({"date": date_str, "error": str(ex)})
+
+        return {"dates_checked": [yesterday_str, today_str], "games": output}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/sync")
 def sync_record():
     """Auto-submit completed games from yesterday and today."""

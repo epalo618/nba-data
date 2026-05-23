@@ -20,10 +20,13 @@ def get_record() -> dict:
 
 
 def save_game_result(game_id: str, game_date: str, predicted_winner: str, actual_winner: str, correct: bool):
-    get_client().table("prediction_record").upsert({
-        "game_id": game_id,
-        "game_date": game_date,
-        "predicted_winner": predicted_winner,
-        "actual_winner": actual_winner,
-        "correct": correct,
-    }).execute()
+    get_client().table("prediction_record").upsert(
+        {
+            "game_id": game_id,
+            "game_date": game_date,
+            "predicted_winner": predicted_winner,
+            "actual_winner": actual_winner,
+            "correct": correct,
+        },
+        on_conflict="game_id",
+    ).execute()
