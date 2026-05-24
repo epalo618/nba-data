@@ -7,6 +7,9 @@ from zoneinfo import ZoneInfo
 
 router = APIRouter()
 
+# Only track games on or after this date (when the tracker went live)
+TRACKER_START_DATE = "2026-05-23"
+
 
 class GameResult(BaseModel):
     game_id: str
@@ -22,6 +25,15 @@ def _eastern_today() -> str:
 def get_record():
     try:
         return supabase_service.get_record()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/reset")
+def reset_record():
+    try:
+        supabase_service.delete_all_records()
+        return {"ok": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -105,6 +117,7 @@ def sync_record():
         dates = [
             (datetime.now(eastern) - timedelta(days=i)).strftime("%Y-%m-%d")
             for i in range(7)
+            if (datetime.now(eastern) - timedelta(days=i)).strftime("%Y-%m-%d") >= TRACKER_START_DATE
         ]
 
         for date_str in dates:

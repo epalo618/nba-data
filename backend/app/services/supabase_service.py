@@ -19,6 +19,10 @@ def get_record() -> dict:
     return {"wins": wins, "losses": losses, "total": wins + losses}
 
 
+def delete_all_records():
+    get_client().table("prediction_record").delete().neq("game_id", "").execute()
+
+
 def save_game_result(game_id: str, game_date: str, predicted_winner: str, actual_winner: str, correct: bool):
     client = get_client()
     existing = client.table("prediction_record").select("game_id").eq("game_id", game_id).execute().data
