@@ -4,8 +4,9 @@ from typing import Optional
 from app.services import nba_service
 
 
-def _sigmoid(x: float) -> float:
-    return 1 / (1 + math.exp(-x))
+def _norm_cdf(x: float) -> float:
+    """Standard normal CDF via math.erf — no scipy needed."""
+    return 0.5 * (1 + math.erf(x / math.sqrt(2)))
 
 
 def _confidence_label(pct: float) -> str:
@@ -24,146 +25,94 @@ def calculate_win_probability(
     home_name: str = "Home",
     away_name: str = "Away",
 ) -> dict:
-    all_stats = nba_service.get_team_season_stats()
     adv_stats = nba_service.get_team_advanced_stats()
-
-    base_stats = {r["TEAM_ID"]: r for r in all_stats}
     adv = {r["TEAM_ID"]: r for r in adv_stats}
 
-    home = base_stats.get(home_team_id, {})
-    away = base_stats.get(away_team_id, {})
     home_adv = adv.get(home_team_id, {})
     away_adv = adv.get(away_team_id, {})
 
-    home_wp = home.get("W_PCT", 0.5)
-    away_wp = away.get("W_PCT", 0.5)
-    wp_diff = home_wp - away_wp
+    home_net = float(home_adv.get("NET_RATING", 0) or 0)
+    away_net = float(away_adv.get("NET_RATING", 0) or 0)
+    home_ortg = float(home_adv.get("OFF_RATING", 110) or 110)
+    home_drtg = float(home_adv.get("DEF_RATING", 110) or 110)
+    away_ortg = float(away_adv.get("OFF_RATING", 110) or 110)
+    away_drtg = float(away_adv.get("DEF_RATING", 110) or 110)
 
-    home_net = home_adv.get("NET_RATING", 0)
-    away_net = away_adv.get("NET_RATING", 0)
-    net_diff = home_net - away_net
-
-    home_ortg = home_adv.get("OFF_RATING", 110)
-    home_drtg = home_adv.get("DEF_RATING", 110)
-    away_ortg = away_adv.get("OFF_RATING", 110)
-    away_drtg = away_adv.get("DEF_RATING", 110)
-
-    home_pts = home.get("PTS", 0)
-    away_pts = away.get("PTS", 0)
-
+    # Recent form: average point differential over last 10 games
     home_games = nba_service.get_team_last_n_games(home_team_id, 10)
     away_games = nba_service.get_team_last_n_games(away_team_id, 10)
-    home_recent_wins = sum(1 for g in home_games if g.get("WL") == "W")
-    away_recent_wins = sum(1 for g in away_games if g.get("WL") == "W")
-    home_recent_wp = home_recent_wins / max(len(home_games), 1)
-    away_recent_wp = away_recent_wins / max(len(away_games), 1)
-    form_diff = home_recent_wp - away_recent_wp
 
-    home_court = 0.6
+    def recent_net_rating(games: list) -> float:
+        diffs = [g.get("PTS", 0) - g.get("PTS_ALLOWED", 0) for g in games]
+        return sum(diffs) / len(diffs) if diffs else 0.0
 
-    score = (
-        wp_diff * 1.5
-        + net_diff * 0.08
-        + form_diff * 0.8
-        + home_court
-    )
+    home_recent = recent_net_rating(home_games)
+    away_recent = recent_net_rating(away_games)
 
-    home_prob = _sigmoid(score)
+    # Blend season net rating (65%) with recent form (35%)
+    home_adj = 0.65 * home_net + 0.35 * home_recent
+    away_adj = 0.65 * away_net + 0.35 * away_recent
+
+    # Project spread: net rating diff + home court (empirical NBA average: +2.5 pts)
+    HOME_COURT = 2.5
+    spread = (home_adj - away_adj) + HOME_COURT
+
+    # Convert spread to win probability via normal CDF
+    # NBA game-to-game std dev ≈ 11 pts (empirically established)
+    NBA_STD = 11.0
+    home_prob = _norm_cdf(spread / NBA_STD)
     away_prob = 1 - home_prob
+
     favored = home_name if home_prob >= 0.5 else away_name
     underdog = away_name if home_prob >= 0.5 else home_name
     fav_net = home_net if home_prob >= 0.5 else away_net
     dog_net = away_net if home_prob >= 0.5 else home_net
-    fav_wp = home_wp if home_prob >= 0.5 else away_wp
-    dog_wp = away_wp if home_prob >= 0.5 else home_wp
-    fav_wins = home_recent_wins if home_prob >= 0.5 else away_recent_wins
-    dog_wins = away_recent_wins if home_prob >= 0.5 else home_recent_wins
+    fav_recent = home_recent if home_prob >= 0.5 else away_recent
+    dog_recent = away_recent if home_prob >= 0.5 else home_recent
     fav_ortg = home_ortg if home_prob >= 0.5 else away_ortg
     fav_drtg = home_drtg if home_prob >= 0.5 else away_drtg
     dog_ortg = away_ortg if home_prob >= 0.5 else home_ortg
     dog_drtg = away_drtg if home_prob >= 0.5 else home_drtg
-    fav_pts = home_pts if home_prob >= 0.5 else away_pts
-    dog_pts = away_pts if home_prob >= 0.5 else home_pts
 
     reasons = []
 
-    # Net rating reason
     net_gap = abs(fav_net - dog_net)
-    if net_gap >= 10:
+    if net_gap >= 6:
         reasons.append(
-            f"{favored} has a dominant net rating of {fav_net:+.1f} vs {underdog}'s {dog_net:+.1f} "
-            f"({net_gap:.1f} pt/100 possessions better on both ends)."
+            f"{favored} has a {net_gap:.1f} pt/100 net rating edge ({fav_net:+.1f} vs {dog_net:+.1f}) — a dominant season-long advantage."
         )
-    elif net_gap >= 4:
+    elif net_gap >= 2.5:
         reasons.append(
-            f"{favored}'s net rating of {fav_net:+.1f} outpaces {underdog}'s {dog_net:+.1f} — "
-            f"a meaningful {net_gap:.1f} pt/100 edge over a full season."
+            f"{favored}'s net rating ({fav_net:+.1f}) meaningfully outpaces {underdog}'s ({dog_net:+.1f}) over a full season."
         )
 
-    # Win percentage reason
-    wp_gap = abs(fav_wp - dog_wp)
-    if wp_gap >= 0.2:
+    recent_gap = fav_recent - dog_recent
+    if recent_gap >= 4:
         reasons.append(
-            f"{favored} finished the regular season at {fav_wp:.1%} vs {underdog}'s {dog_wp:.1%} — "
-            f"a {wp_gap:.1%} win rate gap that reflects sustained dominance."
+            f"{favored} has been outscoring opponents by {fav_recent:+.1f} pts/game recently vs {underdog}'s {dog_recent:+.1f} — strong recent form."
         )
-    elif wp_gap >= 0.08:
+    elif recent_gap <= -4:
         reasons.append(
-            f"{favored}'s {fav_wp:.1%} regular season win rate gives them a clear edge over "
-            f"{underdog}'s {dog_wp:.1%}."
+            f"{underdog} has better recent form ({dog_recent:+.1f} pt diff L10) but {favored}'s season-long efficiency still projects a win."
         )
 
-    # Offense vs Defense matchup
     off_adv = fav_ortg - dog_drtg
     if off_adv >= 4:
         reasons.append(
-            f"{favored}'s offense ({fav_ortg:.1f} ORtg) should feast against {underdog}'s defense "
-            f"({dog_drtg:.1f} DRtg) — a {off_adv:.1f} pt mismatch."
+            f"{favored}'s offense ({fav_ortg:.1f} ORtg) vs {underdog}'s defense ({dog_drtg:.1f} DRtg) is a {off_adv:.1f} pt mismatch."
         )
-    def_adv = dog_ortg - fav_drtg
-    if def_adv <= -3:
+    elif dog_ortg - fav_drtg <= -3:
         reasons.append(
-            f"{favored}'s defense ({fav_drtg:.1f} DRtg) is elite and will limit {underdog}'s "
-            f"offense ({dog_ortg:.1f} ORtg) — a {abs(def_adv):.1f} pt suppression edge."
+            f"{favored}'s defense ({fav_drtg:.1f} DRtg) significantly limits {underdog}'s offense ({dog_ortg:.1f} ORtg)."
         )
 
-    # Recent form reason — only mention if favored team actually has better recent record
-    form_gap = fav_wins - dog_wins
-    if form_gap >= 3:
-        reasons.append(
-            f"{favored} is playing better basketball lately, going {fav_wins}-{10 - fav_wins} "
-            f"over their last 10 vs {underdog}'s {dog_wins}-{10 - dog_wins}."
-        )
-    elif form_gap >= 1 and fav_wins >= 6:
-        reasons.append(
-            f"Recent form favors {favored} ({fav_wins}-{10 - fav_wins} L10) "
-            f"over {underdog} ({dog_wins}-{10 - dog_wins} L10)."
-        )
-    elif form_gap <= -3:
-        reasons.append(
-            f"{underdog} has better recent form ({dog_wins}-{10 - dog_wins} L10 vs {favored}'s "
-            f"{fav_wins}-{10 - fav_wins}), but {favored}'s overall efficiency still projects a win."
-        )
-
-    # Scoring output
-    pts_gap = abs(fav_pts - dog_pts)
-    if pts_gap >= 5:
-        reasons.append(
-            f"{favored} averaged {fav_pts:.1f} PPG this season vs {underdog}'s {dog_pts:.1f} — "
-            f"a {pts_gap:.1f} point scoring advantage."
-        )
-
-    # Home court
     if home_prob >= 0.5:
-        reasons.append(f"{favored} has home court advantage tonight, worth ~3–4 pts historically.")
+        reasons.append(f"{favored} has home court (+2.5 pts on average).")
     else:
-        reasons.append(
-            f"Despite playing at {home_name}'s home court, {favored}'s edge in talent and efficiency "
-            f"overcomes the home court boost."
-        )
+        reasons.append(f"{favored}'s efficiency edge overcomes {home_name}'s home court advantage.")
 
     if not reasons:
-        reasons.append(f"This is a close matchup — {favored} holds a slight statistical edge.")
+        reasons.append(f"Close matchup — {favored} holds a slight edge based on net rating and recent form.")
 
     return {
         "home_win_prob": round(home_prob, 3),
@@ -171,10 +120,11 @@ def calculate_win_probability(
         "favored_team": favored,
         "reasons": reasons,
         "factors": {
-            "win_pct_diff": round(wp_diff, 3),
-            "net_rating_diff": round(net_diff, 2),
-            "form_diff": round(form_diff, 3),
-            "home_court_advantage": True,
+            "home_net_rating": round(home_net, 2),
+            "away_net_rating": round(away_net, 2),
+            "home_recent_net": round(home_recent, 2),
+            "away_recent_net": round(away_recent, 2),
+            "projected_spread": round(spread, 1),
         },
     }
 
