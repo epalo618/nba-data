@@ -234,10 +234,7 @@ def project_player_stats(player_id: int, opponent_team_id: int, stat_cols: list[
         else:
             base = 0.30 * season_avg + 0.45 * l10 + 0.25 * l5
 
-        rest_mult = {0: 0.92, 1: 0.96, 2: 0.99}.get(_days_rest(recent_games), 1.0)
-        home_mult = 1.025 if is_home else 0.975
-
-        projection = int(round(base * (1 + opp_factor) * rest_mult * home_mult))
+        projection = int(round(base * (1 + opp_factor)))
 
         results.append({
             "player_id": int(player_id),
