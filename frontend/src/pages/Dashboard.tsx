@@ -7,20 +7,12 @@ import { Link } from 'react-router-dom'
 import clsx from 'clsx'
 
 export default function Dashboard() {
-  const { data: gamesData, loading: gamesLoading, refetch: refetchGames } = useApi(() => gamesApi.getToday())
+  const { data: gamesData, loading: gamesLoading } = useApi(() => gamesApi.getToday())
   const { data: bestBets, loading: betsLoading } = useApi(() => predictionsApi.getBestBets())
   const { data: recordData, refetch: refetchRecord } = useApi(() => recordApi.get())
   const [record, setRecord] = useState<{ wins: number; losses: number }>({ wins: 0, losses: 0 })
 
   const games = (gamesData as any)?.games ?? []
-  const hasLiveGame = games.some((g: any) => g.GAME_STATUS_ID === 2)
-
-  // Poll every 30 seconds while any game is live
-  useEffect(() => {
-    if (!hasLiveGame) return
-    const interval = setInterval(() => refetchGames(), 30000)
-    return () => clearInterval(interval)
-  }, [hasLiveGame])
 
   useEffect(() => {
     if (recordData) {
@@ -78,37 +70,19 @@ export default function Dashboard() {
                 <div>
                   <div className="text-white font-semibold">{game.away_team_name}</div>
                   <div className="text-gray-500 text-xs">AWAY</div>
-                  {game.GAME_STATUS_ID >= 2 && (
-                    <div className={clsx('text-2xl font-bold mt-1', game.GAME_STATUS_ID === 2 ? 'text-green-400' : 'text-white')}>
-                      {game.VISITOR_SCORE ?? 0}
-                    </div>
-                  )}
                 </div>
                 <div className="text-center">
-                  {game.GAME_STATUS_ID === 2 ? (
-                    <div className="text-xs font-semibold text-green-400 animate-pulse">{game.GAME_STATUS_TEXT}</div>
-                  ) : game.GAME_STATUS_ID === 3 ? (
-                    <div className="text-xs text-gray-500">Final</div>
-                  ) : (
-                    <div className="text-brand font-bold text-lg">vs</div>
-                  )}
+                  <div className="text-brand font-bold text-lg">vs</div>
                   {game.h2h_games_played > 0 && (
                     <div className="text-xs text-gray-500 mt-0.5">
                       H2H {game.h2h_away_wins}-{game.h2h_home_wins}
                     </div>
                   )}
-                  {game.GAME_STATUS_ID === 1 && (
-                    <div className="text-xs text-gray-500 mt-0.5">{game.GAME_STATUS_TEXT}</div>
-                  )}
+                  <div className="text-xs text-gray-500 mt-0.5">{game.GAME_STATUS_TEXT}</div>
                 </div>
                 <div className="text-right">
                   <div className="text-white font-semibold">{game.home_team_name}</div>
                   <div className="text-gray-500 text-xs">HOME</div>
-                  {game.GAME_STATUS_ID >= 2 && (
-                    <div className={clsx('text-2xl font-bold mt-1', game.GAME_STATUS_ID === 2 ? 'text-green-400' : 'text-white')}>
-                      {game.HOME_SCORE ?? 0}
-                    </div>
-                  )}
                 </div>
               </div>
 
