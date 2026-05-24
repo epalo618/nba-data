@@ -203,6 +203,16 @@ def calculate_projected_total(home_team_id: int, away_team_id: int) -> float:
     return round(home_proj_pts + away_proj_pts, 1)
 
 
+def _decay_avg(games: list, col: str, scale: float = 1, decay: float = 0.85) -> float | None:
+    """Exponential decay weighted average. Index 0 (most recent game) gets highest weight."""
+    vals = [(g.get(col, 0) or 0) * scale for g in games if g.get(col) is not None]
+    if not vals:
+        return None
+    weights = np.array([decay ** i for i in range(len(vals))])
+    weights = weights / weights.sum()
+    return round(float(np.dot(vals, weights)), 1)
+
+
 def project_player_stats(player_id: int, opponent_team_id: int, stat_cols: list[str]) -> list[dict]:
     all_players = nba_service.get_player_season_stats()
     player_map = {p["PLAYER_ID"]: p for p in all_players}
@@ -214,56 +224,50 @@ def project_player_stats(player_id: int, opponent_team_id: int, stat_cols: list[
     last5 = recent_games[:5]
     last10 = recent_games[:10]
 
-    # Get opponent's defensive rank for each stat category
-    all_team_stats = nba_service.get_team_season_stats()
-    sorted_by_pts_allowed = sorted(all_team_stats, key=lambda x: x.get("OPP_PTS", 0))
-    opp_rank_map = {r["TEAM_ID"]: i + 1 for i, r in enumerate(sorted_by_pts_allowed)}
-    opp_rank = opp_rank_map.get(opponent_team_id, 15)
+    # Stat-specific opponent defensive ranks (rank 1 = worst defense = easiest matchup)
+    try:
+        opp_ranks = nba_service.get_opponent_stat_ranks().get(int(opponent_team_id), {})
+    except Exception:
+        opp_ranks = {}
+
+    # Playoff sample size — scale playoff weight by games played (full weight at 10+)
+    playoff_gp = int(player.get("PLAYOFF_GP", 0))
+    playoff_scale = min(playoff_gp / 10, 1.0)
 
     results = []
-    stat_map = {
-        "PTS": "PTS",
-        "REB": "REB",
-        "AST": "AST",
-        "STL": "STL",
-        "BLK": "BLK",
-        "FG3M": "FG3M",
-    }
-    pct_stats: set = set()
+    stat_map = {"PTS": "PTS", "REB": "REB", "AST": "AST", "STL": "STL", "BLK": "BLK", "FG3M": "FG3M"}
 
     for stat in stat_cols:
         col = stat_map.get(stat, stat)
-        is_pct = stat in pct_stats
-        scale = 100 if is_pct else 1
-        season_avg = (player.get(col, 0) or 0) * scale
+        season_avg = float((player.get(col, 0) or 0))
 
         raw_reg = player.get(f"{col}_REG")
         raw_playoff = player.get(f"{col}_PLAYOFF")
-        reg_avg = round((raw_reg or 0) * scale, 1) if raw_reg is not None else round(season_avg, 1)
-        playoff_avg = round((raw_playoff or 0) * scale, 1) if raw_playoff is not None else None
+        reg_avg = float(round(raw_reg or 0, 1)) if raw_reg is not None else round(season_avg, 1)
+        playoff_avg = float(round(raw_playoff or 0, 1)) if raw_playoff is not None else None
 
-        def _avg(games, col, scale=scale):
-            vals = [(g.get(col, 0) or 0) * scale for g in games if g.get(col) is not None]
-            return round(np.mean(vals), 1) if vals else season_avg
+        l5 = _decay_avg(last5, col) or season_avg
+        l10 = _decay_avg(last10, col) or season_avg
 
-        l5 = _avg(last5, col)
-        l10 = _avg(last10, col)
+        # Stat-specific opponent factor: rank 1 → +0.15, rank 16 → 0, rank 30 → -0.14
+        opp_rank = int(opp_ranks.get(stat, 15))
+        opp_factor = (16 - opp_rank) / 100
 
-        opp_factor = (16 - opp_rank) / 100  # -0.15 to +0.15
         if playoff_avg is not None:
-            projection = round(
-                0.20 * reg_avg
-                + 0.25 * playoff_avg
-                + 0.35 * l10
+            # Redistribute unused playoff weight to L10 (60%) and season avg (40%)
+            p_weight = 0.20 * playoff_scale
+            extra = 0.20 * (1 - playoff_scale)
+            base = (
+                (0.35 + extra * 0.60) * l10
+                + (0.25 + extra * 0.40) * season_avg
+                + p_weight * playoff_avg
                 + 0.15 * l5
-                + 0.05 * (season_avg * (1 + opp_factor)),
-                1,
+                + 0.05 * reg_avg
             )
         else:
-            projection = round(
-                0.40 * season_avg + 0.35 * l10 + 0.15 * l5 + 0.10 * (season_avg * (1 + opp_factor)),
-                1,
-            )
+            base = 0.40 * season_avg + 0.35 * l10 + 0.15 * l5 + 0.10 * season_avg
+
+        projection = float(round(base * (1 + opp_factor), 1))
 
         results.append({
             "player_id": int(player_id),
@@ -275,8 +279,8 @@ def project_player_stats(player_id: int, opponent_team_id: int, stat_cols: list[
             "playoff_avg": float(playoff_avg) if playoff_avg is not None else None,
             "last5_avg": float(l5),
             "last10_avg": float(l10),
-            "opponent_rank": int(opp_rank),
-            "projection": float(projection),
+            "opponent_rank": opp_rank,
+            "projection": projection,
         })
 
     return results

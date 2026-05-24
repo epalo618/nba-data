@@ -36,6 +36,7 @@ def _prewarm_caches():
 
         nba_service.get_team_season_stats()
         nba_service.get_team_advanced_stats()
+        nba_service.get_opponent_stat_ranks()
         nba_service.get_todays_games()
         nba_service._get_all_game_scores()
         nba_service.get_player_season_stats()

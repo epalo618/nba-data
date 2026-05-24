@@ -118,12 +118,14 @@ def get_player_season_stats():
             blended = dict(row)
             if pid in playoff_map:
                 prow = playoff_map[pid]
+                blended["PLAYOFF_GP"] = int(prow.get("GP", 0))
                 for col in blend_cols:
                     if col in row and col in prow:
                         blended[f"{col}_REG"] = round(row[col] or 0, 1)
                         blended[f"{col}_PLAYOFF"] = round(prow[col] or 0, 1)
                         blended[col] = round(0.5 * (row[col] or 0) + 0.5 * (prow[col] or 0), 1)
             else:
+                blended["PLAYOFF_GP"] = 0
                 for col in blend_cols:
                     if col in row:
                         blended[f"{col}_REG"] = round(row[col] or 0, 1)
@@ -131,6 +133,42 @@ def get_player_season_stats():
             result.append(blended)
         return result
     return _cached("player_season_stats", fetch)
+
+
+def get_opponent_stat_ranks() -> dict:
+    """Per-stat defensive ranks per team. rank 1 = worst defense (allows most) for that stat."""
+    def fetch():
+        resp = leaguedashteamstats.LeagueDashTeamStats(
+            season=CURRENT_SEASON,
+            measure_type_detailed_defense="Opponent",
+            per_mode_detailed="PerGame",
+            timeout=30,
+        )
+        records = resp.get_data_frames()[0].to_dict(orient="records")
+
+        stat_to_col = {
+            "PTS": "OPP_PTS",
+            "REB": "OPP_REB",
+            "AST": "OPP_AST",
+            "STL": "OPP_STL",
+            "BLK": "OPP_BLK",
+            "FG3M": "OPP_FG3M",
+        }
+
+        ranks: dict = {}
+        for stat, col in stat_to_col.items():
+            if not records or col not in records[0]:
+                continue
+            # Descending: rank 1 = allows most of this stat = worst defense = easiest matchup
+            sorted_teams = sorted(records, key=lambda x: x.get(col, 0) or 0, reverse=True)
+            for i, team in enumerate(sorted_teams):
+                tid = int(team["TEAM_ID"])
+                if tid not in ranks:
+                    ranks[tid] = {}
+                ranks[tid][stat] = i + 1
+
+        return ranks
+    return _cached("opponent_stat_ranks", fetch)
 
 
 def _parse_scoreboard(date_str: str) -> dict:
