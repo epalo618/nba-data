@@ -57,7 +57,7 @@ def get_game_player_projections(home_team_id: int, away_team_id: int, top_n: int
         home_projections = []
         for p in home_players:
             pid = p["PLAYER_ID"]
-            projs = project_player_stats(pid, away_team_id, PROP_STATS)
+            projs = project_player_stats(pid, away_team_id, PROP_STATS, is_home=True)
             home_projections.append({
                 "player_id": pid,
                 "player_name": p["PLAYER_NAME"],
@@ -68,7 +68,7 @@ def get_game_player_projections(home_team_id: int, away_team_id: int, top_n: int
         away_projections = []
         for p in away_players:
             pid = p["PLAYER_ID"]
-            projs = project_player_stats(pid, home_team_id, PROP_STATS)
+            projs = project_player_stats(pid, home_team_id, PROP_STATS, is_home=False)
             away_projections.append({
                 "player_id": pid,
                 "player_name": p["PLAYER_NAME"],
@@ -101,7 +101,7 @@ def get_best_bets():
             if not home_id or not away_id:
                 continue
 
-            for team_id, opp_id in [(home_id, away_id), (away_id, home_id)]:
+            for team_id, opp_id, is_home in [(home_id, away_id, True), (away_id, home_id, False)]:
                 team_players = sorted(
                     [p for p in all_player_stats if p.get("TEAM_ID") == team_id],
                     key=lambda x: x.get("MIN", 0),
@@ -110,7 +110,7 @@ def get_best_bets():
 
                 for p in team_players:
                     try:
-                        projs = project_player_stats(p["PLAYER_ID"], opp_id, ["PTS", "REB", "AST", "FG3M", "STL", "BLK"])
+                        projs = project_player_stats(p["PLAYER_ID"], opp_id, ["PTS", "REB", "AST", "FG3M", "STL", "BLK"], is_home=is_home)
                     except Exception:
                         continue
                     for proj in projs:
@@ -196,12 +196,13 @@ def get_yesterday_results():
                     continue
 
                 team_id = player_row.get("TEAM_ID")
-                opp_id = away_id if team_id == home_id else home_id
+                is_home = team_id == home_id
+                opp_id = away_id if is_home else home_id
                 if not opp_id:
                     continue
 
                 try:
-                    projs = project_player_stats(pid, opp_id, PROP_STATS)
+                    projs = project_player_stats(pid, opp_id, PROP_STATS, is_home=is_home)
                 except Exception:
                     continue
 

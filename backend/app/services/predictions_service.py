@@ -1,5 +1,7 @@
 import math
 import numpy as np
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from typing import Optional
 from app.services import nba_service
 
@@ -153,6 +155,21 @@ def calculate_projected_total(home_team_id: int, away_team_id: int) -> float:
     return round(home_proj_pts + away_proj_pts, 1)
 
 
+def _days_rest(recent_games: list) -> int:
+    """Days of rest before the upcoming game (0 = back-to-back). Returns 3 if unknown."""
+    if not recent_games:
+        return 3
+    raw = recent_games[0].get("GAME_DATE", "")
+    if not raw:
+        return 3
+    try:
+        last_date = datetime.strptime(str(raw).strip().title(), "%b %d, %Y").date()
+        today = datetime.now(ZoneInfo("America/New_York")).date()
+        return max(0, (today - last_date).days - 1)
+    except Exception:
+        return 3
+
+
 def _decay_avg(games: list, col: str, scale: float = 1, decay: float = 0.85) -> float | None:
     """Exponential decay weighted average. Index 0 (most recent game) gets highest weight."""
     vals = [(g.get(col, 0) or 0) * scale for g in games if g.get(col) is not None]
@@ -163,7 +180,7 @@ def _decay_avg(games: list, col: str, scale: float = 1, decay: float = 0.85) -> 
     return round(float(np.dot(vals, weights)), 1)
 
 
-def project_player_stats(player_id: int, opponent_team_id: int, stat_cols: list[str]) -> list[dict]:
+def project_player_stats(player_id: int, opponent_team_id: int, stat_cols: list[str], is_home: bool = False) -> list[dict]:
     all_players = nba_service.get_player_season_stats()
     player_map = {p["PLAYER_ID"]: p for p in all_players}
     player = player_map.get(player_id)
@@ -199,25 +216,28 @@ def project_player_stats(player_id: int, opponent_team_id: int, stat_cols: list[
         l5 = _decay_avg(last5, col) or season_avg
         l10 = _decay_avg(last10, col) or season_avg
 
-        # Stat-specific opponent factor: rank 1 → +0.15, rank 16 → 0, rank 30 → -0.14
+        # Opponent factor capped at ±8% (rank 1 = worst defense = easiest matchup)
         opp_rank = int(opp_ranks.get(stat, 15))
-        opp_factor = (16 - opp_rank) / 100
+        opp_factor = max(-0.08, min(0.08, (16 - opp_rank) / 100))
 
         if playoff_avg is not None:
             # Redistribute unused playoff weight to L10 (60%) and season avg (40%)
             p_weight = 0.20 * playoff_scale
             extra = 0.20 * (1 - playoff_scale)
             base = (
-                (0.35 + extra * 0.60) * l10
-                + (0.25 + extra * 0.40) * season_avg
+                (0.38 + extra * 0.60) * l10
+                + (0.17 + extra * 0.40) * season_avg
                 + p_weight * playoff_avg
-                + 0.15 * l5
+                + 0.20 * l5
                 + 0.05 * reg_avg
             )
         else:
-            base = 0.40 * season_avg + 0.35 * l10 + 0.15 * l5 + 0.10 * season_avg
+            base = 0.30 * season_avg + 0.45 * l10 + 0.25 * l5
 
-        projection = int(round(base * (1 + opp_factor)))
+        rest_mult = {0: 0.92, 1: 0.96, 2: 0.99}.get(_days_rest(recent_games), 1.0)
+        home_mult = 1.025 if is_home else 0.975
+
+        projection = int(round(base * (1 + opp_factor) * rest_mult * home_mult))
 
         results.append({
             "player_id": int(player_id),
