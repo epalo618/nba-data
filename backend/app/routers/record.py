@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 router = APIRouter()
 
 # Only track games on or after this date (when the tracker went live)
-TRACKER_START_DATE = "2026-05-23"
+TRACKER_START_DATE = "2026-05-22"
 
 
 class GameResult(BaseModel):
