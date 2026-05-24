@@ -345,6 +345,28 @@ def get_game_boxscore(game_id: str) -> list[dict]:
     return _cached(f"boxscore_{game_id}", fetch)
 
 
+def get_team_game_results_for_date(date_str: str) -> list[dict]:
+    """Completed team game rows for a date via LeagueGameLog (more reliable than scoreboard)."""
+    def fetch():
+        for season_type in ["Playoffs", "Regular Season"]:
+            try:
+                resp = leaguegamelog.LeagueGameLog(
+                    season=CURRENT_SEASON,
+                    season_type_all_star=season_type,
+                    player_or_team_abbreviation="T",
+                    date_from_nullable=date_str,
+                    date_to_nullable=date_str,
+                    timeout=60,
+                )
+                records = resp.get_data_frames()[0].to_dict(orient="records")
+                if records:
+                    return records
+            except Exception:
+                pass
+        return []
+    return _cached(f"team_game_results_{date_str}", fetch)
+
+
 def get_player_stats_for_date(date_str: str) -> list[dict]:
     """All player game stats for a specific date (single API call, playoffs first)."""
     last_error = None

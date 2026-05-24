@@ -95,37 +95,45 @@ def debug_sync():
 
 @router.post("/sync")
 def sync_record():
-    """Auto-submit completed games from yesterday and today."""
+    """Auto-submit completed games from the last 7 days using LeagueGameLog."""
     try:
+        from collections import defaultdict
         all_teams = {t["id"]: t for t in nba_service.get_all_teams()}
         submitted = []
 
         eastern = ZoneInfo("America/New_York")
-        today_str = datetime.now(eastern).strftime("%Y-%m-%d")
-        yesterday_str = (datetime.now(eastern) - timedelta(days=1)).strftime("%Y-%m-%d")
+        dates = [
+            (datetime.now(eastern) - timedelta(days=i)).strftime("%Y-%m-%d")
+            for i in range(7)
+        ]
 
-        for date_str in [yesterday_str, today_str]:
-            try:
-                data = nba_service.get_games_for_date(date_str)
-            except Exception:
+        for date_str in dates:
+            rows = nba_service.get_team_game_results_for_date(date_str)
+            if not rows:
                 continue
 
-            for game in data.get("games", []):
-                if game.get("GAME_STATUS_ID") != 3:
-                    continue
-                home_id = game.get("HOME_TEAM_ID")
-                away_id = game.get("VISITOR_TEAM_ID")
-                home_score = game.get("HOME_SCORE", 0)
-                away_score = game.get("VISITOR_SCORE", 0)
-                if not home_id or not away_id or not home_score or not away_score:
-                    continue
-                if home_score == away_score:
+            by_game: dict = defaultdict(list)
+            for row in rows:
+                by_game[row["GAME_ID"]].append(row)
+
+            for game_id, teams in by_game.items():
+                if len(teams) != 2:
                     continue
 
+                # MATCHUP field: "OKC vs. SAS" = home, "OKC @ SAS" = away
+                home_row = next((r for r in teams if "vs." in r.get("MATCHUP", "")), None)
+                away_row = next((r for r in teams if " @ " in r.get("MATCHUP", "")), None)
+                if not home_row or not away_row:
+                    continue
+
+                home_id = int(home_row["TEAM_ID"])
+                away_id = int(away_row["TEAM_ID"])
                 home_info = all_teams.get(home_id, {})
                 away_info = all_teams.get(away_id, {})
-                home_name = home_info.get("full_name", f"{game.get('HOME_TEAM_CITY', '')} {game.get('HOME_TEAM_NAME', '')}".strip())
-                away_name = away_info.get("full_name", f"{game.get('VISITOR_TEAM_CITY', '')} {game.get('VISITOR_TEAM_NAME', '')}".strip())
+                home_name = home_info.get("full_name", str(home_row.get("TEAM_NAME", "")))
+                away_name = away_info.get("full_name", str(away_row.get("TEAM_NAME", "")))
+
+                actual = home_name if home_row.get("WL") == "W" else away_name
 
                 try:
                     win_probs = calculate_win_probability(home_id, away_id, home_name, away_name)
@@ -136,17 +144,14 @@ def sync_record():
                 if not predicted:
                     continue
 
-                actual = home_name if home_score > away_score else away_name
-                correct = predicted == actual
-
                 supabase_service.save_game_result(
-                    game_id=game["GAME_ID"],
+                    game_id=str(game_id),
                     game_date=date_str,
                     predicted_winner=predicted,
                     actual_winner=actual,
-                    correct=correct,
+                    correct=predicted == actual,
                 )
-                submitted.append({"game_id": game["GAME_ID"], "correct": correct})
+                submitted.append({"game_id": str(game_id), "correct": predicted == actual})
 
         return {"synced": len(submitted), "results": submitted, **supabase_service.get_record()}
     except Exception as e:
