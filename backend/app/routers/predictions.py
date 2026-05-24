@@ -216,7 +216,7 @@ def get_yesterday_results():
                         continue
 
                     season_avg = float(proj["season_avg"])
-                    projection = float(proj["projection"])
+                    projection = int(proj["projection"])
                     predicted_over = bool(projection >= season_avg)
                     went_over = bool(actual_val >= season_avg)
                     correct = bool(predicted_over == went_over)

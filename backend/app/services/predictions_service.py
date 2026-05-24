@@ -267,7 +267,7 @@ def project_player_stats(player_id: int, opponent_team_id: int, stat_cols: list[
         else:
             base = 0.40 * season_avg + 0.35 * l10 + 0.15 * l5 + 0.10 * season_avg
 
-        projection = float(round(base * (1 + opp_factor), 1))
+        projection = int(round(base * (1 + opp_factor)))
 
         results.append({
             "player_id": int(player_id),
