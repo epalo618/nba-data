@@ -36,4 +36,5 @@ export const recordApi = {
     api.post('/record/submit', { game_id, predicted_winner, actual_winner }),
   sync: () => api.post('/record/sync', {}),
   syncPoints: () => api.post('/record/points/sync', {}),
+  debugPoints: () => api.get('/record/points/debug'),
 }
