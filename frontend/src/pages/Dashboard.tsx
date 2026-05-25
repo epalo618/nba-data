@@ -11,6 +11,8 @@ export default function Dashboard() {
   const { data: bestBets, loading: betsLoading } = useApi(() => predictionsApi.getBestBets())
   const { data: recordData, refetch: refetchRecord } = useApi(() => recordApi.get())
   const { data: pointsData, refetch: refetchPoints } = useApi(() => recordApi.getPoints())
+  const { data: historyData, refetch: refetchHistory } = useApi(() => recordApi.getHistory())
+  const { data: pointsHistoryData, refetch: refetchPointsHistory } = useApi(() => recordApi.getPointsHistory())
   const [record, setRecord] = useState<{ wins: number; losses: number }>({ wins: 0, losses: 0 })
   const [pointsRecord, setPointsRecord] = useState<{ wins: number; losses: number }>({ wins: 0, losses: 0 })
 
@@ -37,6 +39,8 @@ export default function Dashboard() {
         await Promise.all([recordApi.sync(), recordApi.syncPoints()])
         refetchRecord?.()
         refetchPoints?.()
+        refetchHistory?.()
+        refetchPointsHistory?.()
       } catch {}
     }
     sync()
@@ -155,6 +159,62 @@ export default function Dashboard() {
           ))}
         </div>
       )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Predicted Winner Table */}
+        <div>
+          <h2 className="text-lg font-bold text-white mb-3">Predicted Winner History</h2>
+          <div className="bg-surface-card border border-surface-border rounded-xl overflow-hidden">
+            <div className="grid grid-cols-4 gap-2 px-4 py-2 text-xs text-gray-500 uppercase border-b border-surface-border">
+              <span>Date</span>
+              <span>Predicted</span>
+              <span>Actual</span>
+              <span className="text-center">Result</span>
+            </div>
+            {((historyData as any[]) ?? []).length === 0 ? (
+              <div className="px-4 py-6 text-center text-gray-500 text-sm">No records yet.</div>
+            ) : (
+              ((historyData as any[]) ?? []).map((row: any, i: number) => (
+                <div key={i} className="grid grid-cols-4 gap-2 px-4 py-2.5 border-b border-surface-border last:border-0 text-sm items-center">
+                  <span className="text-gray-400 text-xs">{row.game_date}</span>
+                  <span className="text-white truncate text-xs">{row.predicted_winner?.split(' ').slice(-1)[0]}</span>
+                  <span className="text-white truncate text-xs">{row.actual_winner?.split(' ').slice(-1)[0]}</span>
+                  <span className={clsx('text-center font-bold', row.correct ? 'text-green-400' : 'text-red-400')}>
+                    {row.correct ? '✓' : '✗'}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Proj Pts Table */}
+        <div>
+          <h2 className="text-lg font-bold text-white mb-3">Proj Pts History</h2>
+          <div className="bg-surface-card border border-surface-border rounded-xl overflow-hidden">
+            <div className="grid grid-cols-4 gap-2 px-4 py-2 text-xs text-gray-500 uppercase border-b border-surface-border">
+              <span>Date</span>
+              <span>Projected</span>
+              <span>Actual</span>
+              <span className="text-center">Result</span>
+            </div>
+            {((pointsHistoryData as any[]) ?? []).length === 0 ? (
+              <div className="px-4 py-6 text-center text-gray-500 text-sm">No records yet.</div>
+            ) : (
+              ((pointsHistoryData as any[]) ?? []).map((row: any, i: number) => (
+                <div key={i} className="grid grid-cols-4 gap-2 px-4 py-2.5 border-b border-surface-border last:border-0 text-sm items-center">
+                  <span className="text-gray-400 text-xs">{row.game_date}</span>
+                  <span className="text-white font-semibold">{Math.round(row.projected_total)}</span>
+                  <span className="text-white font-semibold">{Math.round(row.actual_total)}</span>
+                  <span className={clsx('text-center font-bold', row.correct ? 'text-green-400' : 'text-red-400')}>
+                    {row.correct ? '✓ OVER' : '✗ UNDER'}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
 
       <div>
         <h2 className="text-xl font-bold text-white mb-1">Top Prop Signals</h2>

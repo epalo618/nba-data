@@ -32,6 +32,8 @@ export const predictionsApi = {
 export const recordApi = {
   get: () => api.get('/record'),
   getPoints: () => api.get('/record/points'),
+  getHistory: () => api.get('/record/history'),
+  getPointsHistory: () => api.get('/record/points/history'),
   submit: (game_id: string, predicted_winner: string, actual_winner: string) =>
     api.post('/record/submit', { game_id, predicted_winner, actual_winner }),
   sync: () => api.post('/record/sync', {}),

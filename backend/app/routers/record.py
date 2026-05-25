@@ -171,6 +171,14 @@ def sync_record():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/history")
+def get_record_history():
+    try:
+        return supabase_service.get_full_record()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/points")
 def get_points_record():
     try:
@@ -184,6 +192,14 @@ def reset_points_record():
     try:
         supabase_service.delete_all_points_records()
         return {"ok": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/points/history")
+def get_points_record_history():
+    try:
+        return supabase_service.get_full_points_record()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

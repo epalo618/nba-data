@@ -19,6 +19,10 @@ def get_record() -> dict:
     return {"wins": wins, "losses": losses, "total": wins + losses}
 
 
+def get_full_record() -> list:
+    return get_client().table("prediction_record").select("*").order("game_date", desc=True).execute().data
+
+
 def delete_all_records():
     get_client().table("prediction_record").delete().neq("game_id", "").execute()
 
@@ -28,6 +32,10 @@ def get_points_record() -> dict:
     wins = sum(1 for r in rows if r["correct"])
     losses = sum(1 for r in rows if not r["correct"])
     return {"wins": wins, "losses": losses, "total": wins + losses}
+
+
+def get_full_points_record() -> list:
+    return get_client().table("points_record").select("*").order("game_date", desc=True).execute().data
 
 
 def delete_all_points_records():

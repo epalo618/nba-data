@@ -138,8 +138,6 @@ def calculate_projected_total(home_team_id: int, away_team_id: int) -> float:
     home = adv.get(home_team_id, {})
     away = adv.get(away_team_id, {})
 
-    # pace-adjusted projection: (home_off + away_off + home_def_allowed + away_def_allowed) / 2
-    # using ortg and drtg
     home_ortg = home.get("OFF_RATING", 110)
     home_drtg = home.get("DEF_RATING", 110)
     away_ortg = away.get("OFF_RATING", 110)
@@ -148,11 +146,32 @@ def calculate_projected_total(home_team_id: int, away_team_id: int) -> float:
     away_pace = away.get("PACE", 100)
     avg_pace = (home_pace + away_pace) / 2
 
-    # Expected points each team scores
-    home_proj_pts = ((home_ortg + away_drtg) / 2) * (avg_pace / 100)
-    away_proj_pts = ((away_ortg + home_drtg) / 2) * (avg_pace / 100)
+    season_home = ((home_ortg + away_drtg) / 2) * (avg_pace / 100)
+    season_away = ((away_ortg + home_drtg) / 2) * (avg_pace / 100)
+    season_proj = season_home + season_away
 
-    return int(round(home_proj_pts + away_proj_pts))
+    # Blend with recent form (last 8 games) — captures playoff pace/defense shifts
+    try:
+        home_games = nba_service.get_team_last_n_games(home_team_id, 8)
+        away_games = nba_service.get_team_last_n_games(away_team_id, 8)
+
+        def _avg(games, field):
+            vals = [float(g[field]) for g in games if g.get(field) is not None]
+            return sum(vals) / len(vals) if vals else None
+
+        h_scored  = _avg(home_games, "PTS")
+        h_allowed = _avg(home_games, "PTS_ALLOWED")
+        a_scored  = _avg(away_games, "PTS")
+        a_allowed = _avg(away_games, "PTS_ALLOWED")
+
+        if all(v is not None for v in [h_scored, h_allowed, a_scored, a_allowed]):
+            recent_proj = (h_scored + a_allowed) / 2 + (a_scored + h_allowed) / 2
+            # 60% recent form, 40% season baseline
+            return int(round(0.6 * recent_proj + 0.4 * season_proj))
+    except Exception:
+        pass
+
+    return int(round(season_proj))
 
 
 def _days_rest(recent_games: list) -> int:
