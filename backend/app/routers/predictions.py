@@ -230,6 +230,7 @@ def get_yesterday_results():
 
                     results.append({
                         "game": game_label,
+                        "is_home": is_home,
                         "player_name": proj["player_name"],
                         "team_abbreviation": proj["team_abbreviation"],
                         "stat": stat,
