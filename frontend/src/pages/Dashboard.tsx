@@ -41,14 +41,25 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold text-white mb-1">Today's Games</h1>
           <p className="text-gray-500 text-sm">Win probabilities and projected totals for all NBA games today.</p>
         </div>
-        <div className="flex items-center gap-3 bg-surface-card border border-surface-border rounded-xl px-5 py-3">
-          <span className="text-gray-500 text-sm font-medium">Moneyline W/L Tracker</span>
-          <span className="text-green-400 font-bold text-xl">{record.wins}W</span>
-          <span className="text-gray-600">–</span>
-          <span className="text-red-400 font-bold text-xl">{record.losses}L</span>
-          {total > 0 && (
-            <span className="text-gray-500 text-sm">({Math.round(record.wins / total * 100)}%)</span>
-          )}
+        <div className="flex gap-3 flex-wrap justify-end">
+          <div className="flex items-center gap-3 bg-surface-card border border-surface-border rounded-xl px-5 py-3">
+            <span className="text-gray-500 text-sm font-medium">Moneyline W/L Tracker</span>
+            <span className="text-green-400 font-bold text-xl">{record.wins}W</span>
+            <span className="text-gray-600">–</span>
+            <span className="text-red-400 font-bold text-xl">{record.losses}L</span>
+            {total > 0 && (
+              <span className="text-gray-500 text-sm">({Math.round(record.wins / total * 100)}%)</span>
+            )}
+          </div>
+          <div className="flex items-center gap-3 bg-surface-card border border-surface-border rounded-xl px-5 py-3">
+            <span className="text-gray-500 text-sm font-medium">Proj Pts W/L Tracker</span>
+            <span className="text-green-400 font-bold text-xl">{record.wins}W</span>
+            <span className="text-gray-600">–</span>
+            <span className="text-red-400 font-bold text-xl">{record.losses}L</span>
+            {total > 0 && (
+              <span className="text-gray-500 text-sm">({Math.round(record.wins / total * 100)}%)</span>
+            )}
+          </div>
         </div>
       </div>
 
