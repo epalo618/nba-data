@@ -17,9 +17,9 @@ _cache: dict = {}
 CACHE_TTL = 3600  # 1 hour
 
 
-def _cached(key: str, fn):
+def _cached(key: str, fn, ttl: int = CACHE_TTL):
     now = time.time()
-    if key in _cache and now - _cache[key]["ts"] < CACHE_TTL:
+    if key in _cache and now - _cache[key]["ts"] < ttl:
         return _cache[key]["data"]
     data = fn()
     _cache[key] = {"data": data, "ts": now}
@@ -369,6 +369,8 @@ def get_team_game_results_for_date(date_str: str) -> list[dict]:
 
 def get_player_stats_for_date(date_str: str) -> list[dict]:
     """All player game stats for a specific date (single API call, playoffs first)."""
+    today_str = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
+    ttl = 300 if date_str == today_str else CACHE_TTL  # 5 min for today so results appear quickly
     last_error = None
     def fetch():
         nonlocal last_error
@@ -390,4 +392,4 @@ def get_player_stats_for_date(date_str: str) -> list[dict]:
         if last_error:
             raise last_error
         return []
-    return _cached(f"player_stats_date_{date_str}", fetch)
+    return _cached(f"player_stats_date_{date_str}", fetch, ttl=ttl)

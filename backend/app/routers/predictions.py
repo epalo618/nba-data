@@ -144,18 +144,24 @@ def get_best_bets():
 
 @router.get("/yesterday")
 def get_yesterday_results():
-    """Returns yesterday's player prop projections vs actual stats."""
+    """Returns most recently settled player prop projections vs actual stats."""
     try:
         eastern = ZoneInfo("America/New_York")
+        today = datetime.now(eastern).strftime("%Y-%m-%d")
         yesterday = (datetime.now(eastern) - timedelta(days=1)).strftime("%Y-%m-%d")
 
-        # Single API call for all player stats on that date
-        player_game_rows = nba_service.get_player_stats_for_date(yesterday)
+        # Try today first (LeagueGameLog only returns completed game rows)
+        player_game_rows = nba_service.get_player_stats_for_date(today)
+        date_used = today
+        if not player_game_rows:
+            player_game_rows = nba_service.get_player_stats_for_date(yesterday)
+            date_used = yesterday
+
         if not player_game_rows:
             return []
 
-        # Build game metadata map from yesterday's scoreboard
-        data = nba_service.get_games_for_date(yesterday)
+        # Build game metadata map from the scoreboard for that date
+        data = nba_service.get_games_for_date(date_used)
         game_meta: dict = {}
         for g in data.get("games", []):
             gid = g.get("GAME_ID")

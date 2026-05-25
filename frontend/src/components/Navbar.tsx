@@ -7,7 +7,7 @@ const links = [
   { to: '/teams', label: 'Teams' },
   { to: '/players', label: 'Players' },
   { to: '/predictions', label: 'Best Bets' },
-  { to: '/yesterday', label: 'Yesterday' },
+  { to: '/yesterday', label: 'Settled Games' },
 ]
 
 export default function Navbar() {

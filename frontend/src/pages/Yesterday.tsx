@@ -26,19 +26,19 @@ export default function Yesterday() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-white mb-1">Yesterday's Results</h1>
-        <p className="text-gray-500 text-sm">How the model's projections compared to actual player stats.</p>
+        <h1 className="text-2xl font-bold text-white mb-1">Settled Games</h1>
+        <p className="text-gray-500 text-sm">How the model's projections compared to actual player stats from the most recently completed games.</p>
       </div>
 
       {loading ? (
-        <LoadingSpinner label="Loading yesterday's results..." />
+        <LoadingSpinner label="Loading settled game results..." />
       ) : error ? (
         <div className="bg-surface-card border border-red-900 rounded-xl p-8 text-center text-red-400">
           {error}
         </div>
       ) : rows.length === 0 ? (
         <div className="bg-surface-card border border-surface-border rounded-xl p-8 text-center text-gray-500">
-          No completed games found for yesterday.
+          No completed games found.
         </div>
       ) : (
         <>
