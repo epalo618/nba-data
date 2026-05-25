@@ -10,7 +10,9 @@ export default function Dashboard() {
   const { data: gamesData, loading: gamesLoading } = useApi(() => gamesApi.getToday())
   const { data: bestBets, loading: betsLoading } = useApi(() => predictionsApi.getBestBets())
   const { data: recordData, refetch: refetchRecord } = useApi(() => recordApi.get())
+  const { data: pointsData, refetch: refetchPoints } = useApi(() => recordApi.getPoints())
   const [record, setRecord] = useState<{ wins: number; losses: number }>({ wins: 0, losses: 0 })
+  const [pointsRecord, setPointsRecord] = useState<{ wins: number; losses: number }>({ wins: 0, losses: 0 })
 
   const games = (gamesData as any)?.games ?? []
 
@@ -21,18 +23,27 @@ export default function Dashboard() {
     }
   }, [recordData])
 
-  // Sync yesterday's + today's completed games into the record on load
+  useEffect(() => {
+    if (pointsData) {
+      const r = pointsData as any
+      setPointsRecord({ wins: r.wins ?? 0, losses: r.losses ?? 0 })
+    }
+  }, [pointsData])
+
+  // Sync completed games into both trackers on load
   useEffect(() => {
     const sync = async () => {
       try {
-        await recordApi.sync()
+        await Promise.all([recordApi.sync(), recordApi.syncPoints()])
         refetchRecord?.()
+        refetchPoints?.()
       } catch {}
     }
     sync()
   }, [])
 
   const total = record.wins + record.losses
+  const pointsTotal = pointsRecord.wins + pointsRecord.losses
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-10">
@@ -53,11 +64,11 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-3 bg-surface-card border border-surface-border rounded-xl px-5 py-3">
             <span className="text-gray-500 text-sm font-medium">Proj Pts W/L Tracker</span>
-            <span className="text-green-400 font-bold text-xl">{record.wins}W</span>
+            <span className="text-green-400 font-bold text-xl">{pointsRecord.wins}W</span>
             <span className="text-gray-600">–</span>
-            <span className="text-red-400 font-bold text-xl">{record.losses}L</span>
-            {total > 0 && (
-              <span className="text-gray-500 text-sm">({Math.round(record.wins / total * 100)}%)</span>
+            <span className="text-red-400 font-bold text-xl">{pointsRecord.losses}L</span>
+            {pointsTotal > 0 && (
+              <span className="text-gray-500 text-sm">({Math.round(pointsRecord.wins / pointsTotal * 100)}%)</span>
             )}
           </div>
         </div>
@@ -122,8 +133,8 @@ export default function Dashboard() {
 
               <div className="flex justify-between mt-3 text-sm border-t border-surface-border pt-3">
                 <div>
-                  <span className="text-gray-500">Proj Total </span>
-                  <span className="text-white font-semibold">{game.projected_total}</span>
+                  <span className="text-gray-500">Proj Pts: </span>
+                  <span className="text-white font-semibold">{Math.round(game.projected_total)}</span>
                 </div>
                 {game.over_under_line && (
                   <div>

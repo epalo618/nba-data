@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.services import supabase_service, nba_service
-from app.services.predictions_service import calculate_win_probability
+from app.services.predictions_service import calculate_win_probability, calculate_projected_total
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -167,5 +167,82 @@ def sync_record():
                 submitted.append({"game_id": str(game_id), "correct": predicted == actual})
 
         return {"synced": len(submitted), "results": submitted, **supabase_service.get_record()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/points")
+def get_points_record():
+    try:
+        return supabase_service.get_points_record()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/points/reset")
+def reset_points_record():
+    try:
+        supabase_service.delete_all_points_records()
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/points/sync")
+def sync_points_record():
+    """Auto-submit completed games' projected vs actual total points from last 7 days."""
+    try:
+        from collections import defaultdict
+        submitted = []
+        eastern = ZoneInfo("America/New_York")
+        dates = [
+            (datetime.now(eastern) - timedelta(days=i)).strftime("%Y-%m-%d")
+            for i in range(7)
+            if (datetime.now(eastern) - timedelta(days=i)).strftime("%Y-%m-%d") >= TRACKER_START_DATE
+        ]
+
+        for date_str in dates:
+            rows = nba_service.get_team_game_results_for_date(date_str)
+            if not rows:
+                continue
+
+            by_game: dict = defaultdict(list)
+            for row in rows:
+                by_game[row["GAME_ID"]].append(row)
+
+            for game_id, teams in by_game.items():
+                if len(teams) != 2:
+                    continue
+
+                home_row = next((r for r in teams if "vs." in r.get("MATCHUP", "")), None)
+                away_row = next((r for r in teams if " @ " in r.get("MATCHUP", "")), None)
+                if not home_row or not away_row:
+                    continue
+
+                home_id = int(home_row["TEAM_ID"])
+                away_id = int(away_row["TEAM_ID"])
+
+                home_pts = float(home_row.get("PTS") or 0)
+                away_pts = float(away_row.get("PTS") or 0)
+                actual_total = home_pts + away_pts
+                if actual_total == 0:
+                    continue
+
+                try:
+                    proj_total = float(calculate_projected_total(home_id, away_id))
+                except Exception:
+                    continue
+
+                correct = actual_total >= proj_total
+                supabase_service.save_points_result(
+                    game_id=str(game_id),
+                    game_date=date_str,
+                    projected_total=proj_total,
+                    actual_total=actual_total,
+                    correct=correct,
+                )
+                submitted.append({"game_id": str(game_id), "actual": actual_total, "projected": proj_total, "correct": correct})
+
+        return {"synced": len(submitted), "results": submitted, **supabase_service.get_points_record()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

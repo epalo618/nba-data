@@ -152,7 +152,7 @@ def calculate_projected_total(home_team_id: int, away_team_id: int) -> float:
     home_proj_pts = ((home_ortg + away_drtg) / 2) * (avg_pace / 100)
     away_proj_pts = ((away_ortg + home_drtg) / 2) * (avg_pace / 100)
 
-    return round(home_proj_pts + away_proj_pts, 1)
+    return int(round(home_proj_pts + away_proj_pts))
 
 
 def _days_rest(recent_games: list) -> int:
