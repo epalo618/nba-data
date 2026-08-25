@@ -27,27 +27,43 @@ class NumpyJSONResponse(JSONResponse):
         return json.dumps(content, cls=_NumpyEncoder, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
 
 
+def _prewarm_nba(service):
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    service.get_team_season_stats()
+    service.get_team_advanced_stats()
+    service.get_opponent_stat_ranks()
+    service.get_todays_games()
+    service._get_all_game_scores()
+    service.get_player_season_stats()
+
+    # Pre-warm yesterday's data for the Yesterday page (single API call)
+    eastern = ZoneInfo("America/New_York")
+    yesterday = (datetime.now(eastern) - timedelta(days=1)).strftime("%Y-%m-%d")
+    service.get_games_for_date(yesterday)
+    service.get_player_stats_for_date(yesterday)
+
+
+# Per-sport prewarm routines. Only "nba" is wired up today — nfl/soccer get their
+# own entries here once their service modules land (Phases 4 and 6).
+_PREWARM_ROUTINES = {
+    "nba": _prewarm_nba,
+}
+
+
 def _prewarm_caches():
     """Pre-warm heavy caches on startup so first user request is fast."""
-    try:
-        from app.services import nba_service
-        from datetime import datetime, timedelta
-        from zoneinfo import ZoneInfo
+    from app.services.sports_registry import SPORT_SERVICES
 
-        nba_service.get_team_season_stats()
-        nba_service.get_team_advanced_stats()
-        nba_service.get_opponent_stat_ranks()
-        nba_service.get_todays_games()
-        nba_service._get_all_game_scores()
-        nba_service.get_player_season_stats()
-
-        # Pre-warm yesterday's data for the Yesterday page (single API call)
-        eastern = ZoneInfo("America/New_York")
-        yesterday = (datetime.now(eastern) - timedelta(days=1)).strftime("%Y-%m-%d")
-        nba_service.get_games_for_date(yesterday)
-        nba_service.get_player_stats_for_date(yesterday)
-    except Exception:
-        pass  # don't crash startup if NBA API is down
+    for sport, service in SPORT_SERVICES.items():
+        routine = _PREWARM_ROUTINES.get(sport)
+        if not routine:
+            continue
+        try:
+            routine(service)
+        except Exception:
+            pass  # don't crash startup if a sport's data source is down
 
 
 @asynccontextmanager
@@ -68,11 +84,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
-app.include_router(players.router, prefix="/api/players", tags=["players"])
-app.include_router(games.router, prefix="/api/games", tags=["games"])
-app.include_router(predictions.router, prefix="/api/predictions", tags=["predictions"])
-app.include_router(record.router, prefix="/api/record", tags=["record"])
+app.include_router(teams.router, prefix="/api/{sport}/teams", tags=["teams"])
+app.include_router(players.router, prefix="/api/{sport}/players", tags=["players"])
+app.include_router(games.router, prefix="/api/{sport}/games", tags=["games"])
+app.include_router(predictions.router, prefix="/api/{sport}/predictions", tags=["predictions"])
+app.include_router(record.router, prefix="/api/{sport}/record", tags=["record"])
 
 
 @app.get("/api/health")
@@ -89,10 +105,10 @@ def debug_games():
 @app.get("/api/debug/odds")
 async def debug_odds():
     from app.services import odds_service
-    events = await odds_service.get_nba_events()
+    events = await odds_service.get_events("basketball_nba")
     if not events:
         return {"error": "no events returned — check ODDS_API_KEY", "events": []}
     event = events[0]
-    bookmakers = await odds_service.get_player_props(event["id"])
+    bookmakers = await odds_service.get_player_props("basketball_nba", event["id"])
     props = odds_service.parse_player_props(bookmakers)
     return {"event": event.get("id"), "bookmaker_count": len(bookmakers), "sample_props": dict(list(props.items())[:3])}

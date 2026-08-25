@@ -1,24 +1,8 @@
-import math
-import numpy as np
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from typing import Optional
 from app.services import nba_service
-
-
-def _norm_cdf(x: float) -> float:
-    """Standard normal CDF via math.erf — no scipy needed."""
-    return 0.5 * (1 + math.erf(x / math.sqrt(2)))
-
-
-def _confidence_label(pct: float) -> str:
-    if pct >= 0.70:
-        return "STRONG"
-    elif pct >= 0.62:
-        return "HIGH"
-    elif pct >= 0.55:
-        return "MED"
-    return "LOW"
+from app.services.predictions_common import _norm_cdf, _confidence_label, _decay_avg, get_prop_recommendation
 
 
 def calculate_win_probability(
@@ -26,6 +10,7 @@ def calculate_win_probability(
     away_team_id: int,
     home_name: str = "Home",
     away_name: str = "Away",
+    league: str | None = None,
 ) -> dict:
     adv_stats = nba_service.get_team_advanced_stats()
     adv = {r["TEAM_ID"]: r for r in adv_stats}
@@ -131,7 +116,7 @@ def calculate_win_probability(
     }
 
 
-def calculate_projected_total(home_team_id: int, away_team_id: int) -> float:
+def calculate_projected_total(home_team_id: int, away_team_id: int, league: str | None = None) -> float:
     adv_stats = nba_service.get_team_advanced_stats()
     adv = {r["TEAM_ID"]: r for r in adv_stats}
 
@@ -189,17 +174,7 @@ def _days_rest(recent_games: list) -> int:
         return 3
 
 
-def _decay_avg(games: list, col: str, scale: float = 1, decay: float = 0.85) -> float | None:
-    """Exponential decay weighted average. Index 0 (most recent game) gets highest weight."""
-    vals = [(g.get(col, 0) or 0) * scale for g in games if g.get(col) is not None]
-    if not vals:
-        return None
-    weights = np.array([decay ** i for i in range(len(vals))])
-    weights = weights / weights.sum()
-    return round(float(np.dot(vals, weights)), 1)
-
-
-def project_player_stats(player_id: int, opponent_team_id: int, stat_cols: list[str], is_home: bool = False) -> list[dict]:
+def project_player_stats(player_id: int, opponent_team_id: int, stat_cols: list[str], is_home: bool = False, league: str | None = None) -> list[dict]:
     all_players = nba_service.get_player_season_stats()
     player_map = {p["PLAYER_ID"]: p for p in all_players}
     player = player_map.get(player_id)
@@ -270,17 +245,3 @@ def project_player_stats(player_id: int, opponent_team_id: int, stat_cols: list[
         })
 
     return results
-
-
-def get_prop_recommendation(projection: float, line: float) -> tuple[str, str]:
-    diff_pct = (projection - line) / max(line, 0.1)
-    if diff_pct > 0.06:
-        rec = "OVER"
-        conf = _confidence_label(0.5 + min(diff_pct * 2, 0.25))
-    elif diff_pct < -0.06:
-        rec = "UNDER"
-        conf = _confidence_label(0.5 + min(abs(diff_pct) * 2, 0.25))
-    else:
-        rec = "LEAN"
-        conf = "LOW"
-    return rec, conf

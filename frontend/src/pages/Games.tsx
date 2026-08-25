@@ -1,12 +1,14 @@
 import { useApi } from '../hooks/useApi'
-import { gamesApi } from '../services/api'
+import { gamesApi, Sport } from '../services/api'
 import WinProbBar from '../components/WinProbBar'
 import LoadingSpinner from '../components/LoadingSpinner'
-import { Link } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import clsx from 'clsx'
 
 export default function Games() {
-  const { data, loading } = useApi(() => gamesApi.getToday())
+  const { sport } = useParams<{ sport: Sport }>()
+  const s = (sport ?? 'nba') as Sport
+  const { data, loading } = useApi(() => gamesApi.getToday(s), [s])
   const games = (data as any)?.games ?? []
 
   return (
@@ -82,7 +84,7 @@ export default function Games() {
 
               <div className="mt-4 text-right">
                 <Link
-                  to={`/games/${game.HOME_TEAM_ID}/vs/${game.VISITOR_TEAM_ID}`}
+                  to={`/${s}/games/${game.HOME_TEAM_ID}/vs/${game.VISITOR_TEAM_ID}`}
                   className="text-brand text-sm hover:underline font-medium"
                 >
                   Full Matchup Analysis →

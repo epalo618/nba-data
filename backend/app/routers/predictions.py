@@ -1,14 +1,8 @@
 import json
 import numpy as np
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import Response
-from app.services.predictions_service import (
-    project_player_stats,
-    get_prop_recommendation,
-    calculate_win_probability,
-    calculate_projected_total,
-)
-from app.services import nba_service
+from app.dependencies import get_sport_service, get_predictions_service
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -28,18 +22,30 @@ PROP_STATS = ["PTS", "REB", "AST", "STL", "BLK", "FG3M"]
 
 
 @router.get("/player/{player_id}/vs/{opponent_team_id}")
-def get_player_projections(player_id: int, opponent_team_id: int):
+def get_player_projections(
+    player_id: int,
+    opponent_team_id: int,
+    predictions=Depends(get_predictions_service),
+    league: str | None = Query(None),
+):
     try:
-        projections = project_player_stats(player_id, opponent_team_id, PROP_STATS)
+        projections = predictions.project_player_stats(player_id, opponent_team_id, PROP_STATS, league=league)
         return projections
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/game/{home_team_id}/vs/{away_team_id}/players")
-def get_game_player_projections(home_team_id: int, away_team_id: int, top_n: int = 8):
+def get_game_player_projections(
+    home_team_id: int,
+    away_team_id: int,
+    top_n: int = 8,
+    service=Depends(get_sport_service),
+    predictions=Depends(get_predictions_service),
+    league: str | None = Query(None),
+):
     try:
-        all_player_stats = nba_service.get_player_season_stats()
+        all_player_stats = service.get_player_season_stats(league=league)
 
         # Filter to players on each team, sorted by minutes
         home_players = sorted(
@@ -57,7 +63,7 @@ def get_game_player_projections(home_team_id: int, away_team_id: int, top_n: int
         home_projections = []
         for p in home_players:
             pid = p["PLAYER_ID"]
-            projs = project_player_stats(pid, away_team_id, PROP_STATS, is_home=True)
+            projs = predictions.project_player_stats(pid, away_team_id, PROP_STATS, is_home=True, league=league)
             home_projections.append({
                 "player_id": pid,
                 "player_name": p["PLAYER_NAME"],
@@ -68,7 +74,7 @@ def get_game_player_projections(home_team_id: int, away_team_id: int, top_n: int
         away_projections = []
         for p in away_players:
             pid = p["PLAYER_ID"]
-            projs = project_player_stats(pid, home_team_id, PROP_STATS, is_home=False)
+            projs = predictions.project_player_stats(pid, home_team_id, PROP_STATS, is_home=False, league=league)
             away_projections.append({
                 "player_id": pid,
                 "player_name": p["PLAYER_NAME"],
@@ -87,12 +93,12 @@ def get_game_player_projections(home_team_id: int, away_team_id: int, top_n: int
 
 
 @router.get("/best-bets")
-def get_best_bets():
+def get_best_bets(service=Depends(get_sport_service), predictions=Depends(get_predictions_service), league: str | None = Query(None)):
     """Returns top prop bets ranked by projection vs combined season avg gap."""
     try:
-        data = nba_service.get_todays_games()
+        data = service.get_todays_games(league=league)
         games = data["games"]
-        all_player_stats = nba_service.get_player_season_stats()
+        all_player_stats = service.get_player_season_stats(league=league)
 
         best_bets = []
         for game in games:
@@ -110,7 +116,7 @@ def get_best_bets():
 
                 for p in team_players:
                     try:
-                        projs = project_player_stats(p["PLAYER_ID"], opp_id, ["PTS", "REB", "AST", "FG3M", "STL", "BLK"], is_home=is_home)
+                        projs = predictions.project_player_stats(p["PLAYER_ID"], opp_id, ["PTS", "REB", "AST", "FG3M", "STL", "BLK"], is_home=is_home, league=league)
                     except Exception:
                         continue
                     for proj in projs:
@@ -143,7 +149,7 @@ def get_best_bets():
 
 
 @router.get("/yesterday")
-def get_yesterday_results():
+def get_yesterday_results(service=Depends(get_sport_service), predictions=Depends(get_predictions_service), league: str | None = Query(None)):
     """Returns most recently settled player prop projections vs actual stats."""
     try:
         eastern = ZoneInfo("America/New_York")
@@ -151,17 +157,17 @@ def get_yesterday_results():
         yesterday = (datetime.now(eastern) - timedelta(days=1)).strftime("%Y-%m-%d")
 
         # Try today first (LeagueGameLog only returns completed game rows)
-        player_game_rows = nba_service.get_player_stats_for_date(today)
+        player_game_rows = service.get_player_stats_for_date(today, league=league)
         date_used = today
         if not player_game_rows:
-            player_game_rows = nba_service.get_player_stats_for_date(yesterday)
+            player_game_rows = service.get_player_stats_for_date(yesterday, league=league)
             date_used = yesterday
 
         if not player_game_rows:
             return []
 
         # Build game metadata map from the scoreboard for that date
-        data = nba_service.get_games_for_date(date_used)
+        data = service.get_games_for_date(date_used, league=league)
         game_meta: dict = {}
         for g in data.get("games", []):
             gid = g.get("GAME_ID")
@@ -208,7 +214,7 @@ def get_yesterday_results():
                     continue
 
                 try:
-                    projs = project_player_stats(pid, opp_id, PROP_STATS, is_home=is_home)
+                    projs = predictions.project_player_stats(pid, opp_id, PROP_STATS, is_home=is_home, league=league)
                 except Exception:
                     continue
 

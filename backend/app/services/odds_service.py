@@ -10,7 +10,7 @@ ODDS_BASE_URL = "https://api.the-odds-api.com/v4"
 
 BOOKMAKER_PRIORITY = ["fanduel", "draftkings", "betmgm"]
 
-STAT_TO_MARKET = {
+STAT_TO_MARKET_NBA = {
     "PTS": "player_points",
     "REB": "player_rebounds",
     "AST": "player_assists",
@@ -26,25 +26,25 @@ BOOKMAKER_DISPLAY = {
 }
 
 
-async def get_nba_events() -> list[dict]:
-    if not ODDS_API_KEY:
+async def get_events(sport_key: str) -> list[dict]:
+    if not ODDS_API_KEY or not sport_key:
         return []
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            f"{ODDS_BASE_URL}/sports/basketball_nba/events",
+            f"{ODDS_BASE_URL}/sports/{sport_key}/events",
             params={"apiKey": ODDS_API_KEY},
             timeout=10,
         )
         return resp.json() if resp.status_code == 200 else []
 
 
-async def get_player_props(event_id: str) -> list[dict]:
-    if not ODDS_API_KEY:
+async def get_player_props(sport_key: str, event_id: str) -> list[dict]:
+    if not ODDS_API_KEY or not sport_key:
         return []
-    markets = ",".join(STAT_TO_MARKET.values())
+    markets = ",".join(STAT_TO_MARKET_NBA.values())
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            f"{ODDS_BASE_URL}/sports/basketball_nba/events/{event_id}/odds",
+            f"{ODDS_BASE_URL}/sports/{sport_key}/events/{event_id}/odds",
             params={
                 "apiKey": ODDS_API_KEY,
                 "regions": "us",
@@ -88,12 +88,12 @@ def parse_player_props(bookmakers: list[dict]) -> dict:
     return result
 
 
-async def get_nba_odds() -> list[dict]:
-    if not ODDS_API_KEY:
+async def get_odds(sport_key: str) -> list[dict]:
+    if not ODDS_API_KEY or not sport_key:
         return []
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            f"{ODDS_BASE_URL}/sports/basketball_nba/odds",
+            f"{ODDS_BASE_URL}/sports/{sport_key}/odds",
             params={
                 "apiKey": ODDS_API_KEY,
                 "regions": "us",

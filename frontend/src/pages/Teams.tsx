@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
-import { teamsApi } from '../services/api'
+import { teamsApi, Sport } from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
 
 const COLS = [
@@ -20,7 +21,9 @@ const COLS = [
 ]
 
 export default function Teams() {
-  const { data, loading } = useApi(() => teamsApi.getStats())
+  const { sport } = useParams<{ sport: Sport }>()
+  const s = (sport ?? 'nba') as Sport
+  const { data, loading } = useApi(() => teamsApi.getStats(s), [s])
   const [sort, setSort] = useState<string>('W_PCT')
   const [asc, setAsc] = useState(false)
   const [search, setSearch] = useState('')

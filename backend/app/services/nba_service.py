@@ -55,15 +55,15 @@ def _get_all_game_scores() -> dict:
     return _cached("all_game_scores", fetch)
 
 
-def get_all_teams():
+def get_all_teams(league: str | None = None):
     return nba_teams_static.get_teams()
 
 
-def get_all_active_players():
+def get_all_active_players(league: str | None = None):
     return nba_players_static.get_active_players()
 
 
-def get_team_season_stats():
+def get_team_season_stats(league: str | None = None):
     def fetch():
         resp = leaguedashteamstats.LeagueDashTeamStats(
             season=CURRENT_SEASON,
@@ -75,7 +75,7 @@ def get_team_season_stats():
     return _cached("team_season_stats", fetch)
 
 
-def get_team_advanced_stats():
+def get_team_advanced_stats(league: str | None = None):
     def fetch():
         resp = leaguedashteamstats.LeagueDashTeamStats(
             season=CURRENT_SEASON,
@@ -88,7 +88,7 @@ def get_team_advanced_stats():
     return _cached("team_advanced_stats", fetch)
 
 
-def get_player_season_stats():
+def get_player_season_stats(league: str | None = None):
     def fetch():
         reg_resp = leaguedashplayerstats.LeagueDashPlayerStats(
             season=CURRENT_SEASON,
@@ -135,7 +135,7 @@ def get_player_season_stats():
     return _cached("player_season_stats", fetch)
 
 
-def get_opponent_stat_ranks() -> dict:
+def get_opponent_stat_ranks(league: str | None = None) -> dict:
     """Per-stat defensive ranks per team. rank 1 = worst defense (allows most) for that stat."""
     def fetch():
         resp = leaguedashteamstats.LeagueDashTeamStats(
@@ -221,7 +221,7 @@ def _parse_scoreboard(date_str: str) -> dict:
     return {"games": games, "line_score": []}
 
 
-def get_games_for_date(date_str: str) -> dict:
+def get_games_for_date(date_str: str, league: str | None = None) -> dict:
     def fetch():
         try:
             return _parse_scoreboard(date_str)
@@ -230,7 +230,7 @@ def get_games_for_date(date_str: str) -> dict:
     return _cached(f"games_{date_str}", fetch)
 
 
-def get_todays_games():
+def get_todays_games(league: str | None = None):
     def fetch():
         # Use Eastern time so the date doesn't flip at 8 PM EST (midnight UTC)
         today = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
@@ -246,7 +246,7 @@ def get_todays_games():
     return data
 
 
-def get_team_last_n_games(team_id: int, n: int = 10):
+def get_team_last_n_games(team_id: int, n: int = 10, league: str | None = None):
     key = f"team_gamelog_{team_id}"
     def fetch():
         playoff_resp = teamgamelog.TeamGameLog(
@@ -280,7 +280,7 @@ def get_team_last_n_games(team_id: int, n: int = 10):
     return _cached(key, fetch)
 
 
-def get_head_to_head(team_id: int, opp_team_id: int) -> dict:
+def get_head_to_head(team_id: int, opp_team_id: int, league: str | None = None) -> dict:
     """Returns this-season H2H record between two teams (playoffs + reg season)."""
     key = f"h2h_{min(team_id, opp_team_id)}_{max(team_id, opp_team_id)}"
     def fetch():
@@ -312,7 +312,7 @@ def get_head_to_head(team_id: int, opp_team_id: int) -> dict:
     return _cached(key, fetch)
 
 
-def get_player_last_n_games(player_id: int, n: int = 10):
+def get_player_last_n_games(player_id: int, n: int = 10, league: str | None = None):
     key = f"player_gamelog_{player_id}"
     def fetch():
         playoff_resp = playergamelog.PlayerGameLog(
@@ -337,7 +337,7 @@ def get_player_last_n_games(player_id: int, n: int = 10):
     return _cached(key, fetch)
 
 
-def get_game_boxscore(game_id: str) -> list[dict]:
+def get_game_boxscore(game_id: str, league: str | None = None) -> list[dict]:
     def fetch():
         resp = boxscoretraditionalv2.BoxScoreTraditionalV2(game_id=game_id, timeout=60)
         df = resp.get_data_frames()[0]  # player stats
@@ -345,7 +345,7 @@ def get_game_boxscore(game_id: str) -> list[dict]:
     return _cached(f"boxscore_{game_id}", fetch)
 
 
-def get_team_game_results_for_date(date_str: str) -> list[dict]:
+def get_team_game_results_for_date(date_str: str, league: str | None = None) -> list[dict]:
     """Completed team game rows for a date via LeagueGameLog (more reliable than scoreboard)."""
     def fetch():
         for season_type in ["Playoffs", "Regular Season"]:
@@ -367,7 +367,7 @@ def get_team_game_results_for_date(date_str: str) -> list[dict]:
     return _cached(f"team_game_results_{date_str}", fetch)
 
 
-def get_player_stats_for_date(date_str: str) -> list[dict]:
+def get_player_stats_for_date(date_str: str, league: str | None = None) -> list[dict]:
     """All player game stats for a specific date (single API call, playoffs first)."""
     today_str = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
     ttl = 300 if date_str == today_str else CACHE_TTL  # 5 min for today so results appear quickly

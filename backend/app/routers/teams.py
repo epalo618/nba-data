@@ -1,18 +1,18 @@
-from fastapi import APIRouter, HTTPException
-from app.services import nba_service
+from fastapi import APIRouter, HTTPException, Depends, Query
+from app.dependencies import get_sport_service
 
 router = APIRouter()
 
 
 @router.get("/")
-def get_teams():
-    return nba_service.get_all_teams()
+def get_teams(service=Depends(get_sport_service)):
+    return service.get_all_teams()
 
 
 @router.get("/stats")
-def get_team_stats():
-    base = nba_service.get_team_season_stats()
-    adv = nba_service.get_team_advanced_stats()
+def get_team_stats(service=Depends(get_sport_service), league: str | None = Query(None)):
+    base = service.get_team_season_stats(league=league)
+    adv = service.get_team_advanced_stats(league=league)
     adv_map = {r["TEAM_ID"]: r for r in adv}
     merged = []
     for t in base:
@@ -30,8 +30,8 @@ def get_team_stats():
 
 
 @router.get("/{team_id}/gamelog")
-def get_team_gamelog(team_id: int, n: int = 10):
+def get_team_gamelog(team_id: int, n: int = 10, service=Depends(get_sport_service), league: str | None = Query(None)):
     try:
-        return nba_service.get_team_last_n_games(team_id, n)
+        return service.get_team_last_n_games(team_id, n, league=league)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

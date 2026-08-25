@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import Dashboard from './pages/Dashboard'
 import Teams from './pages/Teams'
@@ -15,13 +15,14 @@ export default function App() {
         <Navbar />
         <main>
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/teams" element={<Teams />} />
-            <Route path="/players" element={<Players />} />
-            <Route path="/games" element={<Games />} />
-            <Route path="/games/:homeId/vs/:awayId" element={<GameMatchup />} />
-            <Route path="/predictions" element={<Predictions />} />
-            <Route path="/yesterday" element={<Yesterday />} />
+            <Route path="/" element={<Navigate to="/nba" replace />} />
+            <Route path="/:sport" element={<Dashboard />} />
+            <Route path="/:sport/teams" element={<Teams />} />
+            <Route path="/:sport/players" element={<Players />} />
+            <Route path="/:sport/games" element={<Games />} />
+            <Route path="/:sport/games/:homeId/vs/:awayId" element={<GameMatchup />} />
+            <Route path="/:sport/predictions" element={<Predictions />} />
+            <Route path="/:sport/yesterday" element={<Yesterday />} />
           </Routes>
         </main>
       </div>

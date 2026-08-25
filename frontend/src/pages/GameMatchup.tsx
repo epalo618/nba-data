@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
-import { gamesApi, predictionsApi, teamsApi } from '../services/api'
+import { gamesApi, predictionsApi, teamsApi, Sport } from '../services/api'
 import WinProbBar from '../components/WinProbBar'
 import PlayerPropRow from '../components/PlayerPropRow'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -8,16 +8,17 @@ import StatCard from '../components/StatCard'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 
 export default function GameMatchup() {
-  const { homeId, awayId } = useParams<{ homeId: string; awayId: string }>()
+  const { sport, homeId, awayId } = useParams<{ sport: Sport; homeId: string; awayId: string }>()
+  const s = (sport ?? 'nba') as Sport
   const hId = Number(homeId)
   const aId = Number(awayId)
 
-  const { data: matchup, loading: mLoading } = useApi(() => gamesApi.getMatchup(hId, aId), [hId, aId])
+  const { data: matchup, loading: mLoading } = useApi(() => gamesApi.getMatchup(s, hId, aId), [s, hId, aId])
   const { data: playerProjs, loading: pLoading } = useApi(
-    () => predictionsApi.getGamePlayerProjections(hId, aId, 8),
-    [hId, aId]
+    () => predictionsApi.getGamePlayerProjections(s, hId, aId, 8),
+    [s, hId, aId]
   )
-  const { data: allTeamStats } = useApi(() => teamsApi.getStats())
+  const { data: allTeamStats } = useApi(() => teamsApi.getStats(s), [s])
 
   const m = matchup as any
   const pp = playerProjs as any

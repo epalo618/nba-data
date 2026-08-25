@@ -1,18 +1,21 @@
 import { useEffect, useState } from 'react'
+import { useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
-import { gamesApi, predictionsApi, recordApi } from '../services/api'
+import { gamesApi, predictionsApi, recordApi, Sport } from '../services/api'
 import WinProbBar from '../components/WinProbBar'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { Link } from 'react-router-dom'
 import clsx from 'clsx'
 
 export default function Dashboard() {
-  const { data: gamesData, loading: gamesLoading } = useApi(() => gamesApi.getToday())
-  const { data: bestBets, loading: betsLoading } = useApi(() => predictionsApi.getBestBets())
-  const { data: recordData, refetch: refetchRecord } = useApi(() => recordApi.get())
-  const { data: pointsData, refetch: refetchPoints } = useApi(() => recordApi.getPoints())
-  const { data: historyData, refetch: refetchHistory } = useApi(() => recordApi.getHistory())
-  const { data: pointsHistoryData, refetch: refetchPointsHistory } = useApi(() => recordApi.getPointsHistory())
+  const { sport } = useParams<{ sport: Sport }>()
+  const s = (sport ?? 'nba') as Sport
+  const { data: gamesData, loading: gamesLoading } = useApi(() => gamesApi.getToday(s), [s])
+  const { data: bestBets, loading: betsLoading } = useApi(() => predictionsApi.getBestBets(s), [s])
+  const { data: recordData, refetch: refetchRecord } = useApi(() => recordApi.get(s), [s])
+  const { data: pointsData, refetch: refetchPoints } = useApi(() => recordApi.getPoints(s), [s])
+  const { data: historyData, refetch: refetchHistory } = useApi(() => recordApi.getHistory(s), [s])
+  const { data: pointsHistoryData, refetch: refetchPointsHistory } = useApi(() => recordApi.getPointsHistory(s), [s])
   const [record, setRecord] = useState<{ wins: number; losses: number }>({ wins: 0, losses: 0 })
   const [pointsRecord, setPointsRecord] = useState<{ wins: number; losses: number }>({ wins: 0, losses: 0 })
 
@@ -36,7 +39,7 @@ export default function Dashboard() {
   useEffect(() => {
     const sync = async () => {
       try {
-        await Promise.all([recordApi.sync(), recordApi.syncPoints()])
+        await Promise.all([recordApi.sync(s), recordApi.syncPoints(s)])
         refetchRecord?.()
         refetchPoints?.()
         refetchHistory?.()
@@ -44,7 +47,7 @@ export default function Dashboard() {
       } catch {}
     }
     sync()
-  }, [])
+  }, [s])
 
   const total = record.wins + record.losses
   const pointsTotal = pointsRecord.wins + pointsRecord.losses
@@ -89,7 +92,7 @@ export default function Dashboard() {
           {games.map((game: any, i: number) => (
             <Link
               key={i}
-              to={`/games/${game.HOME_TEAM_ID}/vs/${game.VISITOR_TEAM_ID}`}
+              to={`/${s}/games/${game.HOME_TEAM_ID}/vs/${game.VISITOR_TEAM_ID}`}
               className="bg-surface-card border border-surface-border rounded-xl p-5 hover:border-brand transition-colors block"
             >
               <div className="flex justify-between items-center mb-4">

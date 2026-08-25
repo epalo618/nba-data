@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
-from app.services import supabase_service, nba_service
-from app.services.predictions_service import calculate_win_probability, calculate_projected_total
+from app.services import supabase_service
+from app.dependencies import get_sport_service, get_predictions_service
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -22,7 +22,7 @@ def _eastern_today() -> str:
 
 
 @router.get("")
-def get_record():
+def get_record(sport: str):
     try:
         return supabase_service.get_record()
     except Exception as e:
@@ -30,7 +30,7 @@ def get_record():
 
 
 @router.delete("/reset")
-def reset_record():
+def reset_record(sport: str):
     try:
         supabase_service.delete_all_records()
         return {"ok": True}
@@ -39,7 +39,7 @@ def reset_record():
 
 
 @router.post("/submit")
-def submit_result(result: GameResult):
+def submit_result(sport: str, result: GameResult):
     try:
         correct = result.predicted_winner == result.actual_winner
         supabase_service.save_game_result(
@@ -55,10 +55,10 @@ def submit_result(result: GameResult):
 
 
 @router.get("/debug")
-def debug_sync():
+def debug_sync(sport: str, service=Depends(get_sport_service), predictions=Depends(get_predictions_service), league: str | None = Query(None)):
     """Show what the sync endpoint would submit, without writing anything."""
     try:
-        all_teams = {t["id"]: t for t in nba_service.get_all_teams()}
+        all_teams = {t["id"]: t for t in service.get_all_teams(league=league)}
         eastern = ZoneInfo("America/New_York")
         today_str = datetime.now(eastern).strftime("%Y-%m-%d")
         yesterday_str = (datetime.now(eastern) - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -66,7 +66,7 @@ def debug_sync():
         output = []
         for date_str in [yesterday_str, today_str]:
             try:
-                data = nba_service.get_games_for_date(date_str)
+                data = service.get_games_for_date(date_str, league=league)
                 games = data.get("games", [])
                 for game in games:
                     home_id = game.get("HOME_TEAM_ID")
@@ -87,7 +87,7 @@ def debug_sync():
                     }
                     if game.get("GAME_STATUS_ID") == 3 and home_id and away_id:
                         try:
-                            wp = calculate_win_probability(home_id, away_id, home_name, away_name)
+                            wp = predictions.calculate_win_probability(home_id, away_id, home_name, away_name, league=league)
                             entry["predicted_winner"] = wp.get("favored_team")
                             hs = game.get("HOME_SCORE", 0)
                             vs = game.get("VISITOR_SCORE", 0)
@@ -106,11 +106,11 @@ def debug_sync():
 
 
 @router.post("/sync")
-def sync_record():
+def sync_record(sport: str, service=Depends(get_sport_service), predictions=Depends(get_predictions_service), league: str | None = Query(None)):
     """Auto-submit completed games from the last 7 days using LeagueGameLog."""
     try:
         from collections import defaultdict
-        all_teams = {t["id"]: t for t in nba_service.get_all_teams()}
+        all_teams = {t["id"]: t for t in service.get_all_teams(league=league)}
         submitted = []
 
         eastern = ZoneInfo("America/New_York")
@@ -121,7 +121,7 @@ def sync_record():
         ]
 
         for date_str in dates:
-            rows = nba_service.get_team_game_results_for_date(date_str)
+            rows = service.get_team_game_results_for_date(date_str, league=league)
             if not rows:
                 continue
 
@@ -149,7 +149,7 @@ def sync_record():
                 actual = home_name if home_row.get("WL") == "W" else away_name
 
                 try:
-                    win_probs = calculate_win_probability(home_id, away_id, home_name, away_name)
+                    win_probs = predictions.calculate_win_probability(home_id, away_id, home_name, away_name, league=league)
                 except Exception:
                     continue
 
@@ -172,7 +172,7 @@ def sync_record():
 
 
 @router.get("/history")
-def get_record_history():
+def get_record_history(sport: str):
     try:
         return supabase_service.get_full_record()
     except Exception as e:
@@ -180,7 +180,7 @@ def get_record_history():
 
 
 @router.get("/points")
-def get_points_record():
+def get_points_record(sport: str):
     try:
         return supabase_service.get_points_record()
     except Exception as e:
@@ -188,7 +188,7 @@ def get_points_record():
 
 
 @router.delete("/points/reset")
-def reset_points_record():
+def reset_points_record(sport: str):
     try:
         supabase_service.delete_all_points_records()
         return {"ok": True}
@@ -197,7 +197,7 @@ def reset_points_record():
 
 
 @router.get("/points/history")
-def get_points_record_history():
+def get_points_record_history(sport: str):
     try:
         return supabase_service.get_full_points_record()
     except Exception as e:
@@ -205,7 +205,7 @@ def get_points_record_history():
 
 
 @router.get("/points/debug")
-def debug_points_sync():
+def debug_points_sync(sport: str, service=Depends(get_sport_service), predictions=Depends(get_predictions_service), league: str | None = Query(None)):
     """Show what the points sync would submit, without writing anything."""
     try:
         from collections import defaultdict
@@ -218,7 +218,7 @@ def debug_points_sync():
 
         output = []
         for date_str in dates:
-            rows = nba_service.get_team_game_results_for_date(date_str)
+            rows = service.get_team_game_results_for_date(date_str, league=league)
             if not rows:
                 output.append({"date": date_str, "note": "no rows returned"})
                 continue
@@ -260,7 +260,7 @@ def debug_points_sync():
                     continue
 
                 try:
-                    proj_total = float(calculate_projected_total(home_id, away_id))
+                    proj_total = float(predictions.calculate_projected_total(home_id, away_id, league=league))
                     entry["proj_total"] = proj_total
                     entry["correct"] = actual_total >= proj_total
                 except Exception as ex:
@@ -279,7 +279,7 @@ def debug_points_sync():
 
 
 @router.post("/points/sync")
-def sync_points_record():
+def sync_points_record(sport: str, service=Depends(get_sport_service), predictions=Depends(get_predictions_service), league: str | None = Query(None)):
     """Auto-submit completed games' projected vs actual total points from last 7 days."""
     try:
         from collections import defaultdict
@@ -293,7 +293,7 @@ def sync_points_record():
         ]
 
         for date_str in dates:
-            rows = nba_service.get_team_game_results_for_date(date_str)
+            rows = service.get_team_game_results_for_date(date_str, league=league)
             if not rows:
                 continue
 
@@ -320,7 +320,7 @@ def sync_points_record():
                     continue
 
                 try:
-                    proj_total = float(calculate_projected_total(home_id, away_id))
+                    proj_total = float(predictions.calculate_projected_total(home_id, away_id, league=league))
                 except Exception as ex:
                     errors.append({"game_id": str(game_id), "error": f"proj_total: {ex}"})
                     continue
