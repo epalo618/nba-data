@@ -14,19 +14,9 @@ def get_team_stats(service=Depends(get_sport_service), league: str | None = Quer
     base = service.get_team_season_stats(league=league)
     adv = service.get_team_advanced_stats(league=league)
     adv_map = {r["TEAM_ID"]: r for r in adv}
-    merged = []
-    for t in base:
-        tid = t["TEAM_ID"]
-        a = adv_map.get(tid, {})
-        merged.append({
-            **t,
-            "OFF_RATING": a.get("OFF_RATING"),
-            "DEF_RATING": a.get("DEF_RATING"),
-            "NET_RATING": a.get("NET_RATING"),
-            "PACE": a.get("PACE"),
-            "TS_PCT": a.get("TS_PCT"),
-        })
-    return merged
+    # Generic merge: whatever keys each sport's advanced-stats fn returns get added,
+    # with base's own fields taking priority on any name collision.
+    return [{**adv_map.get(t["TEAM_ID"], {}), **t} for t in base]
 
 
 @router.get("/{team_id}/gamelog")

@@ -1,16 +1,18 @@
-from app.services import nba_service
+from app.services import nba_service, nfl_service
 
-# Populated with real modules in later phases (NFL in Phase 4, soccer in Phase 6).
+# Populated with a real module in a later phase (soccer in Phase 6).
 SPORT_SERVICES = {
     "nba": nba_service,
+    "nfl": nfl_service,
 }
 
 PREDICTIONS_SERVICES: dict = {}  # populated below, after predictions_service is defined (avoids circular import)
 
 
 def _load_predictions_services():
-    from app.services import predictions_service
+    from app.services import predictions_service, nfl_predictions_service
     PREDICTIONS_SERVICES["nba"] = predictions_service
+    PREDICTIONS_SERVICES["nfl"] = nfl_predictions_service
 
 
 _load_predictions_services()

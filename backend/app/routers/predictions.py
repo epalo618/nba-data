@@ -23,7 +23,7 @@ PROP_STATS = ["PTS", "REB", "AST", "STL", "BLK", "FG3M"]
 
 @router.get("/player/{player_id}/vs/{opponent_team_id}")
 def get_player_projections(
-    player_id: int,
+    player_id: str,
     opponent_team_id: int,
     predictions=Depends(get_predictions_service),
     league: str | None = Query(None),

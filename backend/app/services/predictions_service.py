@@ -174,7 +174,10 @@ def _days_rest(recent_games: list) -> int:
         return 3
 
 
-def project_player_stats(player_id: int, opponent_team_id: int, stat_cols: list[str], is_home: bool = False, league: str | None = None) -> list[dict]:
+def project_player_stats(player_id: int | str, opponent_team_id: int, stat_cols: list[str], is_home: bool = False, league: str | None = None) -> list[dict]:
+    # player_id arrives as str from the route (NFL's GSIS ids aren't numeric), but
+    # nba_api's PLAYER_ID is an int — cast up front so every lookup below matches.
+    player_id = int(player_id)
     all_players = nba_service.get_player_season_stats()
     player_map = {p["PLAYER_ID"]: p for p in all_players}
     player = player_map.get(player_id)

@@ -21,7 +21,7 @@ export const playersApi = {
   getAll: (sport: Sport, league?: string) => api.get(`/${sport}/players/${lg(league)}`),
   getStats: (sport: Sport, teamId?: number, league?: string) =>
     api.get(`/${sport}/players/stats` + (teamId ? `?team_id=${teamId}${lgAmp(league)}` : lg(league))),
-  getGamelog: (sport: Sport, playerId: number, n = 10, league?: string) =>
+  getGamelog: (sport: Sport, playerId: string | number, n = 10, league?: string) =>
     api.get(`/${sport}/players/${playerId}/gamelog?n=${n}${lgAmp(league)}`),
 }
 
@@ -32,7 +32,7 @@ export const gamesApi = {
 }
 
 export const predictionsApi = {
-  getPlayerProjections: (sport: Sport, playerId: number, opponentTeamId: number, league?: string) =>
+  getPlayerProjections: (sport: Sport, playerId: string | number, opponentTeamId: number, league?: string) =>
     api.get(`/${sport}/predictions/player/${playerId}/vs/${opponentTeamId}${lg(league)}`),
   getGamePlayerProjections: (sport: Sport, homeId: number, awayId: number, topN = 8, league?: string) =>
     api.get(`/${sport}/predictions/game/${homeId}/vs/${awayId}/players?top_n=${topN}${lgAmp(league)}`),

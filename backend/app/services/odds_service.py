@@ -19,6 +19,19 @@ STAT_TO_MARKET_NBA = {
     "BLK": "player_blocks",
 }
 
+# Best-effort mapping to The Odds API's documented NFL player-prop market keys —
+# verify against their docs before relying on it (Phase 8 follow-up).
+STAT_TO_MARKET_NFL = {
+    "PASSING_YARDS": "player_pass_yds",
+    "PASSING_TDS": "player_pass_tds",
+    "PASSING_INTERCEPTIONS": "player_pass_interceptions",
+    "RUSHING_YARDS": "player_rush_yds",
+    "RUSHING_TDS": "player_rush_tds",
+    "RECEIVING_YARDS": "player_reception_yds",
+    "RECEIVING_TDS": "player_reception_tds",
+    "RECEPTIONS": "player_receptions",
+}
+
 BOOKMAKER_DISPLAY = {
     "fanduel": "FanDuel",
     "draftkings": "DraftKings",

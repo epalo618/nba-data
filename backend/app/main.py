@@ -45,10 +45,19 @@ def _prewarm_nba(service):
     service.get_player_stats_for_date(yesterday)
 
 
-# Per-sport prewarm routines. Only "nba" is wired up today — nfl/soccer get their
-# own entries here once their service modules land (Phases 4 and 6).
+def _prewarm_nfl(service):
+    service.get_team_season_stats()
+    service.get_team_advanced_stats()
+    service.get_opponent_stat_ranks()
+    service.get_todays_games()
+    service.get_player_season_stats()
+
+
+# Per-sport prewarm routines. Soccer gets its own entry once its service module
+# lands (Phase 6).
 _PREWARM_ROUTINES = {
     "nba": _prewarm_nba,
+    "nfl": _prewarm_nfl,
 }
 
 

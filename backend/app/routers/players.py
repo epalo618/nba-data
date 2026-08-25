@@ -18,7 +18,7 @@ def get_player_stats(team_id: int = None, service=Depends(get_sport_service), le
 
 
 @router.get("/{player_id}/gamelog")
-def get_player_gamelog(player_id: int, n: int = 10, service=Depends(get_sport_service), league: str | None = Query(None)):
+def get_player_gamelog(player_id: str, n: int = 10, service=Depends(get_sport_service), league: str | None = Query(None)):
     try:
         return service.get_player_last_n_games(player_id, n, league=league)
     except Exception as e:
