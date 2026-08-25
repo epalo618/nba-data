@@ -1,6 +1,7 @@
 import { useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import { predictionsApi, Sport } from '../services/api'
+import { PREDICTION_STAT_CATEGORIES } from '../config/statColumns'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ConfidenceBadge from '../components/ConfidenceBadge'
 import clsx from 'clsx'
@@ -11,10 +12,10 @@ export default function Predictions() {
   const { data, loading } = useApi(() => predictionsApi.getBestBets(s), [s])
   const bets = (data as any[]) ?? []
 
-  const ptsBets = bets.filter(b => b.stat === 'PTS')
-  const rebBets = bets.filter(b => b.stat === 'REB')
-  const astBets = bets.filter(b => b.stat === 'AST')
-  const fg3mBets = bets.filter(b => b.stat === 'FG3M')
+  const categories = PREDICTION_STAT_CATEGORIES[s].map(cat => ({
+    label: cat.label,
+    bets: bets.filter(b => b.stat === cat.key),
+  }))
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
@@ -32,12 +33,7 @@ export default function Predictions() {
         <LoadingSpinner label="Calculating today's best bets..." />
       ) : (
         <div className="space-y-8">
-          {[
-            { label: 'Points Props', bets: ptsBets },
-            { label: 'Rebound Props', bets: rebBets },
-            { label: 'Assist Props', bets: astBets },
-            { label: '3-Pointers Made', bets: fg3mBets },
-          ].map(({ label, bets: catBets }) => (
+          {categories.map(({ label, bets: catBets }) => (
             <div key={label}>
               <h2 className="text-lg font-bold text-white mb-3">{label}</h2>
               <div className="bg-surface-card border border-surface-border rounded-xl overflow-hidden">

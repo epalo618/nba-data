@@ -1,6 +1,7 @@
 import { NavLink, useParams } from 'react-router-dom'
 import clsx from 'clsx'
 import { Sport } from '../services/api'
+import SportSwitcher from './SportSwitcher'
 
 const SUBLINKS = [
   { to: '', label: 'Dashboard' },
@@ -12,17 +13,19 @@ const SUBLINKS = [
 ]
 
 export default function Navbar() {
-  const { sport } = useParams<{ sport: Sport }>()
+  const { sport, league } = useParams<{ sport: Sport; league: string }>()
   const s = (sport ?? 'nba') as Sport
+  const base = s === 'soccer' ? `/soccer/${league ?? 'epl'}` : `/${s}`
 
   return (
     <nav className="bg-surface-card border-b border-surface-border sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 flex items-center h-14 gap-6">
         <span className="text-brand font-bold text-lg tracking-wide mr-4">Sports Analytics</span>
+        <SportSwitcher />
         {SUBLINKS.map(l => (
           <NavLink
             key={l.to}
-            to={`/${s}${l.to}`}
+            to={`${base}${l.to}`}
             end={l.to === ''}
             className={({ isActive }) =>
               clsx('text-sm font-medium transition-colors', isActive ? 'text-brand' : 'text-gray-400 hover:text-white')

@@ -1,8 +1,9 @@
 import axios from 'axios'
+import type { Sport } from '../types/domain'
+
+export type { Sport }
 
 const api = axios.create({ baseURL: import.meta.env.VITE_API_URL ?? '/api' })
-
-export type Sport = 'nba' | 'nfl' | 'soccer'
 
 // Appends ?league=xxx when a league is given (soccer only) — kept as a tiny
 // helper so every call site doesn't repeat the same ternary.

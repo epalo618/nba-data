@@ -2,27 +2,14 @@ import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import { teamsApi, Sport } from '../services/api'
+import { TEAM_COLUMNS } from '../config/statColumns'
+import SortableStatTable from '../components/SortableStatTable'
 import LoadingSpinner from '../components/LoadingSpinner'
-
-const COLS = [
-  { key: 'W', label: 'W' },
-  { key: 'L', label: 'L' },
-  { key: 'W_PCT', label: 'WIN%' },
-  { key: 'PTS', label: 'PTS' },
-  { key: 'REB', label: 'REB' },
-  { key: 'AST', label: 'AST' },
-  { key: 'STL', label: 'STL' },
-  { key: 'BLK', label: 'BLK' },
-  { key: 'TOV', label: 'TOV' },
-  { key: 'OFF_RATING', label: 'ORTG' },
-  { key: 'DEF_RATING', label: 'DRTG' },
-  { key: 'NET_RATING', label: 'NET' },
-  { key: 'PACE', label: 'PACE' },
-]
 
 export default function Teams() {
   const { sport } = useParams<{ sport: Sport }>()
   const s = (sport ?? 'nba') as Sport
+  const COLS = TEAM_COLUMNS[s]
   const { data, loading } = useApi(() => teamsApi.getStats(s), [s])
   const [sort, setSort] = useState<string>('W_PCT')
   const [asc, setAsc] = useState(false)
@@ -57,41 +44,15 @@ export default function Teams() {
         <LoadingSpinner label="Loading team stats..." />
       ) : (
         <div className="bg-surface-card border border-surface-border rounded-xl overflow-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-surface-border">
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">Team</th>
-                {COLS.map(c => (
-                  <th
-                    key={c.key}
-                    className="px-3 py-3 text-gray-500 font-medium cursor-pointer hover:text-white text-right"
-                    onClick={() => handleSort(c.key)}
-                  >
-                    {c.label} {sort === c.key ? (asc ? '↑' : '↓') : ''}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {teams.map((t: any) => (
-                <tr key={t.TEAM_ID} className="border-b border-surface-border hover:bg-surface-hover">
-                  <td className="px-4 py-3">
-                    <span className="text-white font-medium">{t.TEAM_NAME}</span>
-                  </td>
-                  {COLS.map(c => (
-                    <td key={c.key} className="px-3 py-3 text-right text-gray-300">
-                      {c.key === 'W_PCT' ? (t[c.key] * 100).toFixed(1) + '%' :
-                       c.key === 'NET_RATING' ? (
-                         <span className={t[c.key] > 0 ? 'text-green-400' : 'text-red-400'}>
-                           {t[c.key]?.toFixed(1)}
-                         </span>
-                       ) : t[c.key]?.toFixed ? t[c.key].toFixed(1) : t[c.key] ?? '—'}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <SortableStatTable
+            rows={teams}
+            columns={COLS}
+            rowKey={t => t.TEAM_ID}
+            leadingColumns={[{ label: 'Team', render: t => <span className="text-white font-medium">{t.TEAM_NAME}</span> }]}
+            sort={sort}
+            asc={asc}
+            onSort={handleSort}
+          />
         </div>
       )}
     </div>

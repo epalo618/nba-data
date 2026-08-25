@@ -1,14 +1,9 @@
 import { useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import { predictionsApi, Sport } from '../services/api'
+import { YESTERDAY_STAT_ORDER, YESTERDAY_STAT_LABEL } from '../config/statColumns'
 import LoadingSpinner from '../components/LoadingSpinner'
 import clsx from 'clsx'
-
-const STAT_ORDER = ['PTS', 'REB', 'AST', 'FG3M', 'BLK', 'STL']
-const STAT_LABEL: Record<string, string> = {
-  PTS: 'Points', REB: 'Rebounds', AST: 'Assists',
-  FG3M: '3-Pointers Made', BLK: 'Blocks', STL: 'Steals',
-}
 
 function StatTable({ rows }: { rows: any[] }) {
   if (!rows.length) return null
@@ -41,16 +36,16 @@ function StatTable({ rows }: { rows: any[] }) {
   )
 }
 
-function TeamColumn({ label, rows }: { label: string; rows: any[] }) {
+function TeamColumn({ label, rows, statOrder, statLabel }: { label: string; rows: any[]; statOrder: string[]; statLabel: Record<string, string> }) {
   return (
     <div className="flex-1 min-w-0">
       <div className="text-sm font-bold text-white mb-3 pb-2 border-b border-surface-border">{label}</div>
-      {STAT_ORDER.map(stat => {
+      {statOrder.map(stat => {
         const statRows = rows.filter(r => r.stat === stat)
         if (!statRows.length) return null
         return (
           <div key={stat} className="mb-4">
-            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">{STAT_LABEL[stat]}</div>
+            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">{statLabel[stat]}</div>
             <StatTable rows={statRows} />
           </div>
         )
@@ -62,6 +57,8 @@ function TeamColumn({ label, rows }: { label: string; rows: any[] }) {
 export default function Yesterday() {
   const { sport } = useParams<{ sport: Sport }>()
   const s = (sport ?? 'nba') as Sport
+  const statOrder = YESTERDAY_STAT_ORDER[s]
+  const statLabel = YESTERDAY_STAT_LABEL[s]
   const { data, loading, error } = useApi(() => predictionsApi.getYesterday(s), [s])
   const rows = (data as any[]) ?? []
 
@@ -120,9 +117,9 @@ export default function Yesterday() {
             <div key={game}>
               <h2 className="text-lg font-bold text-white mb-4">{game}</h2>
               <div className="flex gap-6">
-                <TeamColumn label={`${awayName} (Away)`} rows={away} />
+                <TeamColumn label={`${awayName} (Away)`} rows={away} statOrder={statOrder} statLabel={statLabel} />
                 <div className="w-px bg-surface-border shrink-0" />
-                <TeamColumn label={`${homeName} (Home)`} rows={home} />
+                <TeamColumn label={`${homeName} (Home)`} rows={home} statOrder={statOrder} statLabel={statLabel} />
               </div>
             </div>
           ))}

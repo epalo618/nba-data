@@ -2,26 +2,14 @@ import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import { playersApi, Sport } from '../services/api'
+import { PLAYER_COLUMNS } from '../config/statColumns'
+import SortableStatTable from '../components/SortableStatTable'
 import LoadingSpinner from '../components/LoadingSpinner'
-
-const COLS = [
-  { key: 'GP', label: 'GP' },
-  { key: 'MIN', label: 'MIN' },
-  { key: 'PTS', label: 'PTS' },
-  { key: 'REB', label: 'REB' },
-  { key: 'AST', label: 'AST' },
-  { key: 'STL', label: 'STL' },
-  { key: 'BLK', label: 'BLK' },
-  { key: 'TOV', label: 'TOV' },
-  { key: 'FG_PCT', label: 'FG%' },
-  { key: 'FG3_PCT', label: '3P%' },
-  { key: 'FT_PCT', label: 'FT%' },
-  { key: 'PLUS_MINUS', label: '+/-' },
-]
 
 export default function Players() {
   const { sport } = useParams<{ sport: Sport }>()
   const s = (sport ?? 'nba') as Sport
+  const COLS = PLAYER_COLUMNS[s]
   const { data, loading } = useApi(() => playersApi.getStats(s), [s])
   const [sort, setSort] = useState<string>('PTS')
   const [asc, setAsc] = useState(false)
@@ -66,43 +54,18 @@ export default function Players() {
       ) : (
         <>
           <div className="bg-surface-card border border-surface-border rounded-xl overflow-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-surface-border">
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">Player</th>
-                  <th className="text-left px-3 py-3 text-gray-500 font-medium">Team</th>
-                  {COLS.map(c => (
-                    <th
-                      key={c.key}
-                      className="px-3 py-3 text-gray-500 font-medium cursor-pointer hover:text-white text-right"
-                      onClick={() => handleSort(c.key)}
-                    >
-                      {c.label} {sort === c.key ? (asc ? '↑' : '↓') : ''}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {paginated.map((p: any) => (
-                  <tr key={p.PLAYER_ID} className="border-b border-surface-border hover:bg-surface-hover">
-                    <td className="px-4 py-2">
-                      <span className="text-white font-medium">{p.PLAYER_NAME}</span>
-                    </td>
-                    <td className="px-3 py-2 text-gray-400">{p.TEAM_ABBREVIATION}</td>
-                    {COLS.map(c => (
-                      <td key={c.key} className="px-3 py-2 text-right text-gray-300">
-                        {c.key.includes('PCT') ? ((p[c.key] ?? 0) * 100).toFixed(1) + '%' :
-                         c.key === 'PLUS_MINUS' ? (
-                           <span className={p[c.key] > 0 ? 'text-green-400' : p[c.key] < 0 ? 'text-red-400' : 'text-gray-400'}>
-                             {p[c.key]?.toFixed(1)}
-                           </span>
-                         ) : p[c.key]?.toFixed ? p[c.key].toFixed(1) : p[c.key] ?? '—'}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <SortableStatTable
+              rows={paginated}
+              columns={COLS}
+              rowKey={p => p.PLAYER_ID}
+              leadingColumns={[
+                { label: 'Player', render: p => <span className="text-white font-medium">{p.PLAYER_NAME}</span> },
+                { label: 'Team', render: p => p.TEAM_ABBREVIATION },
+              ]}
+              sort={sort}
+              asc={asc}
+              onSort={handleSort}
+            />
           </div>
 
           <div className="flex justify-between items-center mt-4 text-sm text-gray-500">

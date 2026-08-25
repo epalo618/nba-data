@@ -52,6 +52,9 @@ export default function Dashboard() {
   const total = record.wins + record.losses
   const pointsTotal = pointsRecord.wins + pointsRecord.losses
 
+  const moneylineLabel = s === 'soccer' ? 'Result W/L Tracker' : 'Moneyline W/L Tracker'
+  const pointsLabel = s === 'soccer' ? 'Proj Goals W/L Tracker' : 'Proj Pts W/L Tracker'
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-10">
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -61,7 +64,7 @@ export default function Dashboard() {
         </div>
         <div className="flex gap-3 flex-wrap justify-end">
           <div className="flex items-center gap-3 bg-surface-card border border-surface-border rounded-xl px-5 py-3">
-            <span className="text-gray-500 text-sm font-medium">Moneyline W/L Tracker</span>
+            <span className="text-gray-500 text-sm font-medium">{moneylineLabel}</span>
             <span className="text-green-400 font-bold text-xl">{record.wins}W</span>
             <span className="text-gray-600">–</span>
             <span className="text-red-400 font-bold text-xl">{record.losses}L</span>
@@ -70,7 +73,7 @@ export default function Dashboard() {
             )}
           </div>
           <div className="flex items-center gap-3 bg-surface-card border border-surface-border rounded-xl px-5 py-3">
-            <span className="text-gray-500 text-sm font-medium">Proj Pts W/L Tracker</span>
+            <span className="text-gray-500 text-sm font-medium">{pointsLabel}</span>
             <span className="text-green-400 font-bold text-xl">{pointsRecord.wins}W</span>
             <span className="text-gray-600">–</span>
             <span className="text-red-400 font-bold text-xl">{pointsRecord.losses}L</span>
