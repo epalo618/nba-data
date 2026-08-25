@@ -1,6 +1,7 @@
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useEffect } from 'react'
 import { Sport } from '../services/api'
+import { useCurrentSport } from '../hooks/useCurrentSport'
 
 const SPORTS: { key: Sport; label: string }[] = [
   { key: 'nba', label: 'NBA' },
@@ -21,13 +22,12 @@ const SOCCER_LEAGUES = [
 ]
 
 export default function SportSwitcher() {
-  const { sport, league } = useParams<{ sport: Sport; league: string }>()
+  const { sport: s, league } = useCurrentSport()
   const navigate = useNavigate()
-  const s = (sport ?? 'nba') as Sport
 
   useEffect(() => {
-    if (sport) localStorage.setItem('lastSport', sport)
-  }, [sport])
+    localStorage.setItem('lastSport', s)
+  }, [s])
 
   const handleSportChange = (next: Sport) => {
     if (next === 'soccer') {

@@ -1,7 +1,7 @@
-import { NavLink, useParams } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import clsx from 'clsx'
-import { Sport } from '../services/api'
 import SportSwitcher from './SportSwitcher'
+import { useCurrentSport } from '../hooks/useCurrentSport'
 
 const SUBLINKS = [
   { to: '', label: 'Dashboard' },
@@ -13,8 +13,7 @@ const SUBLINKS = [
 ]
 
 export default function Navbar() {
-  const { sport, league } = useParams<{ sport: Sport; league: string }>()
-  const s = (sport ?? 'nba') as Sport
+  const { sport: s, league } = useCurrentSport()
   const base = s === 'soccer' ? `/soccer/${league ?? 'epl'}` : `/${s}`
 
   return (

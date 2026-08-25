@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import { playersApi, Sport } from '../services/api'
-import { PLAYER_COLUMNS } from '../config/statColumns'
+import { PLAYER_COLUMNS, DEFAULT_PLAYER_SORT } from '../config/statColumns'
 import SortableStatTable from '../components/SortableStatTable'
 import LoadingSpinner from '../components/LoadingSpinner'
 
@@ -11,7 +11,7 @@ export default function Players() {
   const s = (sport ?? 'nba') as Sport
   const COLS = PLAYER_COLUMNS[s]
   const { data, loading } = useApi(() => playersApi.getStats(s), [s])
-  const [sort, setSort] = useState<string>('PTS')
+  const [sort, setSort] = useState<string>(DEFAULT_PLAYER_SORT[s])
   const [asc, setAsc] = useState(false)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)

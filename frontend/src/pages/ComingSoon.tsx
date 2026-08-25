@@ -1,11 +1,6 @@
 import { useParams } from 'react-router-dom'
 import { Sport } from '../services/api'
-
-const SPORT_LABEL: Record<Sport, string> = {
-  nba: 'NBA',
-  nfl: 'NFL',
-  soccer: 'Soccer',
-}
+import { SPORT_LABEL } from '../types/domain'
 
 export default function ComingSoon() {
   // The /nfl/* routes carry no :sport param (literal path), and /soccer/:league/*

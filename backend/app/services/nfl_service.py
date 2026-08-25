@@ -23,7 +23,10 @@ def _cached(key: str, fn, ttl: int = CACHE_TTL):
 # nflreadpy's load_teams() includes relocated/retired franchise rows (e.g. STL/LA
 # Rams, SD/LAC Chargers, OAK/LV Raiders) that share a team_id with their current
 # incarnation. Exclude the retired abbreviations so ids stay 1:1 with 32 teams.
-_RETIRED_ABBRS = {"LA", "STL", "SD", "OAK"}
+# Note: the Rams' *current* abbreviation in schedules/team_stats/player_stats is
+# "LA", not "LAR" — load_teams() lists both as non-retired, so "LAR" (unused in
+# any game-level data) is the one to drop here, not "LA".
+_RETIRED_ABBRS = {"LAR", "STL", "SD", "OAK"}
 
 # Position-specific prop categories (nflreadpy's player-stats column names, upper-cased).
 POSITION_STAT_COLS = {

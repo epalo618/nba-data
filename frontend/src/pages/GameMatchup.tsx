@@ -5,6 +5,7 @@ import WinProbBar from '../components/WinProbBar'
 import PlayerPropRow from '../components/PlayerPropRow'
 import LoadingSpinner from '../components/LoadingSpinner'
 import StatCard from '../components/StatCard'
+import MatchupStatCards from '../components/matchup/MatchupStatCards'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 
 export default function GameMatchup() {
@@ -94,11 +95,7 @@ export default function GameMatchup() {
         {[{ team: homeTeam, name: homeName, chart: homeChartData }, { team: awayTeam, name: awayName, chart: awayChartData }].map(({ team, name, chart }) => (
           <div key={name} className="bg-surface-card border border-surface-border rounded-xl p-5">
             <h2 className="text-white font-bold mb-3">{name} — Last 10 Games</h2>
-            <div className="grid grid-cols-3 gap-3 mb-4 text-sm">
-              <StatCard label="PTS/G" value={team?.PTS?.toFixed(1) ?? '—'} />
-              <StatCard label="OFF RTG" value={team?.OFF_RATING?.toFixed(1) ?? '—'} />
-              <StatCard label="DEF RTG" value={team?.DEF_RATING?.toFixed(1) ?? '—'} />
-            </div>
+            <MatchupStatCards sport={s} team={team} />
             <ResponsiveContainer width="100%" height={140}>
               <LineChart data={chart}>
                 <XAxis dataKey="game" tick={{ fill: '#6B7280', fontSize: 11 }} />

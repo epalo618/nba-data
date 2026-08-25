@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import { gamesApi, predictionsApi, recordApi, Sport } from '../services/api'
+import { SPORT_LABEL } from '../types/domain'
 import WinProbBar from '../components/WinProbBar'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { Link } from 'react-router-dom'
@@ -60,7 +61,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white mb-1">Today's Games</h1>
-          <p className="text-gray-500 text-sm">Win probabilities and projected totals for all NBA games today.</p>
+          <p className="text-gray-500 text-sm">Win probabilities and projected totals for all {SPORT_LABEL[s]} games today.</p>
         </div>
         <div className="flex gap-3 flex-wrap justify-end">
           <div className="flex items-center gap-3 bg-surface-card border border-surface-border rounded-xl px-5 py-3">

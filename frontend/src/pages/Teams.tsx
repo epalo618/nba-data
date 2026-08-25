@@ -31,7 +31,7 @@ export default function Teams() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-white">All 30 Teams</h1>
+        <h1 className="text-2xl font-bold text-white">{(data as any[])?.length ? `All ${(data as any[]).length} Teams` : 'Teams'}</h1>
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}

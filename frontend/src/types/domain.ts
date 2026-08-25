@@ -1,5 +1,11 @@
 export type Sport = 'nba' | 'nfl' | 'soccer'
 
+export const SPORT_LABEL: Record<Sport, string> = {
+  nba: 'NBA',
+  nfl: 'NFL',
+  soccer: 'Soccer',
+}
+
 export interface Team {
   id: number
   full_name: string

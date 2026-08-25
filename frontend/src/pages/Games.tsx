@@ -1,5 +1,6 @@
 import { useApi } from '../hooks/useApi'
 import { gamesApi, Sport } from '../services/api'
+import { SPORT_LABEL } from '../types/domain'
 import WinProbBar from '../components/WinProbBar'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { Link, useParams } from 'react-router-dom'
@@ -13,7 +14,7 @@ export default function Games() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-white mb-6">Today's NBA Games</h1>
+      <h1 className="text-2xl font-bold text-white mb-6">Today's {SPORT_LABEL[s]} Games</h1>
 
       {loading ? (
         <LoadingSpinner label="Fetching games..." />
