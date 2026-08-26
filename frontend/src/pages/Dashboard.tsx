@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react'
 import { useApi } from '../hooks/useApi'
-import { gamesApi, predictionsApi, recordApi } from '../services/api'
+import { gamesApi, predictionsApi } from '../services/api'
 import { useCurrentSport } from '../hooks/useCurrentSport'
 import { SPORT_LABEL } from '../types/domain'
 import WinProbBar from '../components/WinProbBar'
@@ -12,76 +11,14 @@ export default function Dashboard() {
   const { sport: s } = useCurrentSport()
   const { data: gamesData, loading: gamesLoading } = useApi(() => gamesApi.getToday(s), [s])
   const { data: bestBets, loading: betsLoading } = useApi(() => predictionsApi.getBestBets(s), [s])
-  const { data: recordData, refetch: refetchRecord } = useApi(() => recordApi.get(s), [s])
-  const { data: pointsData, refetch: refetchPoints } = useApi(() => recordApi.getPoints(s), [s])
-  const { data: historyData, refetch: refetchHistory } = useApi(() => recordApi.getHistory(s), [s])
-  const { data: pointsHistoryData, refetch: refetchPointsHistory } = useApi(() => recordApi.getPointsHistory(s), [s])
-  const [record, setRecord] = useState<{ wins: number; losses: number }>({ wins: 0, losses: 0 })
-  const [pointsRecord, setPointsRecord] = useState<{ wins: number; losses: number }>({ wins: 0, losses: 0 })
 
   const games = (gamesData as any)?.games ?? []
 
-  useEffect(() => {
-    if (recordData) {
-      const r = recordData as any
-      setRecord({ wins: r.wins ?? 0, losses: r.losses ?? 0 })
-    }
-  }, [recordData])
-
-  useEffect(() => {
-    if (pointsData) {
-      const r = pointsData as any
-      setPointsRecord({ wins: r.wins ?? 0, losses: r.losses ?? 0 })
-    }
-  }, [pointsData])
-
-  // Sync completed games into both trackers on load
-  useEffect(() => {
-    const sync = async () => {
-      try {
-        await Promise.all([recordApi.sync(s), recordApi.syncPoints(s)])
-        refetchRecord?.()
-        refetchPoints?.()
-        refetchHistory?.()
-        refetchPointsHistory?.()
-      } catch {}
-    }
-    sync()
-  }, [s])
-
-  const total = record.wins + record.losses
-  const pointsTotal = pointsRecord.wins + pointsRecord.losses
-
-  const moneylineLabel = s === 'soccer' ? 'Result W/L Tracker' : 'Moneyline W/L Tracker'
-  const pointsLabel = s === 'soccer' ? 'Proj Goals W/L Tracker' : 'Proj Pts W/L Tracker'
-
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-10">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white mb-1">Today's Games</h1>
-          <p className="text-gray-500 text-sm">Win probabilities and projected totals for all {SPORT_LABEL[s]} games today.</p>
-        </div>
-        <div className="flex gap-3 flex-wrap justify-end">
-          <div className="flex items-center gap-3 bg-surface-card border border-surface-border rounded-xl px-5 py-3">
-            <span className="text-gray-500 text-sm font-medium">{moneylineLabel}</span>
-            <span className="text-green-400 font-bold text-xl">{record.wins}W</span>
-            <span className="text-gray-600">–</span>
-            <span className="text-red-400 font-bold text-xl">{record.losses}L</span>
-            {total > 0 && (
-              <span className="text-gray-500 text-sm">({Math.round(record.wins / total * 100)}%)</span>
-            )}
-          </div>
-          <div className="flex items-center gap-3 bg-surface-card border border-surface-border rounded-xl px-5 py-3">
-            <span className="text-gray-500 text-sm font-medium">{pointsLabel}</span>
-            <span className="text-green-400 font-bold text-xl">{pointsRecord.wins}W</span>
-            <span className="text-gray-600">–</span>
-            <span className="text-red-400 font-bold text-xl">{pointsRecord.losses}L</span>
-            {pointsTotal > 0 && (
-              <span className="text-gray-500 text-sm">({Math.round(pointsRecord.wins / pointsTotal * 100)}%)</span>
-            )}
-          </div>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-white mb-1">Today's Games</h1>
+        <p className="text-gray-500 text-sm">Win probabilities and projected totals for all {SPORT_LABEL[s]} games today.</p>
       </div>
 
       {gamesLoading ? (
@@ -165,62 +102,6 @@ export default function Dashboard() {
           ))}
         </div>
       )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Predicted Winner Table */}
-        <div>
-          <h2 className="text-lg font-bold text-white mb-3">Predicted Winner History</h2>
-          <div className="bg-surface-card border border-surface-border rounded-xl overflow-hidden">
-            <div className="grid grid-cols-4 gap-2 px-4 py-2 text-xs text-gray-500 uppercase border-b border-surface-border">
-              <span>Date</span>
-              <span>Predicted</span>
-              <span>Actual</span>
-              <span className="text-center">Result</span>
-            </div>
-            {((historyData as any[]) ?? []).length === 0 ? (
-              <div className="px-4 py-6 text-center text-gray-500 text-sm">No records yet.</div>
-            ) : (
-              ((historyData as any[]) ?? []).map((row: any, i: number) => (
-                <div key={i} className="grid grid-cols-4 gap-2 px-4 py-2.5 border-b border-surface-border last:border-0 text-sm items-center">
-                  <span className="text-gray-400 text-xs">{row.game_date}</span>
-                  <span className="text-white truncate text-xs">{row.predicted_winner?.split(' ').slice(-1)[0]}</span>
-                  <span className="text-white truncate text-xs">{row.actual_winner?.split(' ').slice(-1)[0]}</span>
-                  <span className={clsx('text-center font-bold', row.correct ? 'text-green-400' : 'text-red-400')}>
-                    {row.correct ? '✓' : '✗'}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Proj Pts Table */}
-        <div>
-          <h2 className="text-lg font-bold text-white mb-3">Proj Pts History</h2>
-          <div className="bg-surface-card border border-surface-border rounded-xl overflow-hidden">
-            <div className="grid grid-cols-4 gap-2 px-4 py-2 text-xs text-gray-500 uppercase border-b border-surface-border">
-              <span>Date</span>
-              <span>Projected</span>
-              <span>Actual</span>
-              <span className="text-center">Result</span>
-            </div>
-            {((pointsHistoryData as any[]) ?? []).length === 0 ? (
-              <div className="px-4 py-6 text-center text-gray-500 text-sm">No records yet.</div>
-            ) : (
-              ((pointsHistoryData as any[]) ?? []).map((row: any, i: number) => (
-                <div key={i} className="grid grid-cols-4 gap-2 px-4 py-2.5 border-b border-surface-border last:border-0 text-sm items-center">
-                  <span className="text-gray-400 text-xs">{row.game_date}</span>
-                  <span className="text-white font-semibold">{Math.round(row.projected_total)}</span>
-                  <span className="text-white font-semibold">{Math.round(row.actual_total)}</span>
-                  <span className={clsx('text-center font-bold', row.correct ? 'text-green-400' : 'text-red-400')}>
-                    {row.correct ? '✓ OVER' : '✗ UNDER'}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
 
       <div>
         <h2 className="text-xl font-bold text-white mb-1">Top Prop Signals</h2>
