@@ -1,14 +1,14 @@
 import { useApi } from '../hooks/useApi'
-import { gamesApi, Sport } from '../services/api'
+import { gamesApi } from '../services/api'
+import { useCurrentSport } from '../hooks/useCurrentSport'
 import { SPORT_LABEL } from '../types/domain'
 import WinProbBar from '../components/WinProbBar'
 import LoadingSpinner from '../components/LoadingSpinner'
-import { Link, useParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import clsx from 'clsx'
 
 export default function Games() {
-  const { sport } = useParams<{ sport: Sport }>()
-  const s = (sport ?? 'nba') as Sport
+  const { sport: s } = useCurrentSport()
   const { data, loading } = useApi(() => gamesApi.getToday(s), [s])
   const games = (data as any)?.games ?? []
 

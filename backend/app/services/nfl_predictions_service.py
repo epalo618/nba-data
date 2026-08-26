@@ -103,9 +103,14 @@ def project_player_stats(player_id: str, opponent_team_id: int, stat_cols: list[
 
     # Position-specific stat categories override whatever generic stat_cols the
     # router passed in — NFL props are position-dependent (a QB has no rushing
-    # peers), unlike NBA's fixed PTS/REB/AST/... list.
+    # peers), unlike NBA's fixed PTS/REB/AST/... list. Positions with no defined
+    # categories here (K, DEF/IDP, OL, ...) have no NFL prop stats to project —
+    # falling back to stat_cols (NBA-shaped) would emit bogus all-zero PTS/REB/
+    # etc. rows, so return nothing for them instead.
     position = player.get("POSITION", "")
-    actual_stats = POSITION_STAT_COLS.get(position, stat_cols)
+    actual_stats = POSITION_STAT_COLS.get(position)
+    if not actual_stats:
+        return []
 
     recent_games = nfl_service.get_player_last_n_games(player_id, 5)
     opp_ranks = nfl_service.get_opponent_stat_ranks().get(opponent_team_id, {})
@@ -113,7 +118,8 @@ def project_player_stats(player_id: str, opponent_team_id: int, stat_cols: list[
     results = []
     for stat in actual_stats:
         season_avg = float(player.get(stat, 0) or 0)
-        l5 = _decay_avg(recent_games, stat) or season_avg
+        decayed = _decay_avg(recent_games, stat)
+        l5 = decayed if decayed is not None else season_avg
 
         # 32-team league midpoint (~16.5), mirrors NBA's 30-team (16) calibration.
         opp_rank = int(opp_ranks.get(stat, 16))

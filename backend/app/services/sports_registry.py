@@ -19,24 +19,29 @@ _load_predictions_services()
 
 # The Odds API sport-key strings. NBA/NFL are plain strings; soccer is a dict of
 # league -> sport_key since each competition is a separate "sport" to that API.
+# Verified against The Odds API's docs (2026-08-25) — soccer's keys don't follow
+# a uniform country-prefix pattern (e.g. "soccer_serie_a", not "soccer_italy_serie_a"),
+# which the original placeholder values got wrong for 4 of these 8.
 ODDS_SPORT_KEYS = {
     "nba": "basketball_nba",
     "nfl": "americanfootball_nfl",
     "soccer": {
         "epl": "soccer_epl",
         "laliga": "soccer_spain_la_liga",
-        "seriea": "soccer_italy_serie_a",
-        "bundesliga": "soccer_germany_bundesliga",
-        "ligue1": "soccer_france_ligue_one",
+        "seriea": "soccer_serie_a",
+        "bundesliga": "soccer_bundesliga",
+        "ligue1": "soccer_ligue_1",
         "ucl": "soccer_uefa_champs_league",
-        "uel": "soccer_uefa_europa_league",
+        "uel": "soccer_europa_league",
         "mls": "soccer_usa_mls",
     },
 }
 
 # API-Football league IDs + display info. Unused until Phase 6 (soccer backend) —
-# defined now so the registry shape is stable. Verify IDs against API-Football's
-# live /leagues list before relying on them.
+# defined now so the registry shape is stable. 7 of 8 ids confirmed against
+# API-Football's public docs/coverage pages (2026-08-25); "mls" is a best-effort
+# placeholder (their site blocks scraping) — confirm it with a live GET
+# /leagues?search=MLS call once an API key exists, before relying on it.
 SOCCER_LEAGUES = {
     "epl": {"api_football_id": 39, "name": "Premier League", "country": "England"},
     "laliga": {"api_football_id": 140, "name": "La Liga", "country": "Spain"},
@@ -45,7 +50,7 @@ SOCCER_LEAGUES = {
     "ligue1": {"api_football_id": 61, "name": "Ligue 1", "country": "France"},
     "ucl": {"api_football_id": 2, "name": "Champions League", "country": "Europe"},
     "uel": {"api_football_id": 3, "name": "Europa League", "country": "Europe"},
-    "mls": {"api_football_id": 253, "name": "MLS", "country": "USA"},
+    "mls": {"api_football_id": 253, "name": "MLS", "country": "USA"},  # unverified, see note above
 }
 
 

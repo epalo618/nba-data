@@ -119,5 +119,5 @@ async def debug_odds():
         return {"error": "no events returned — check ODDS_API_KEY", "events": []}
     event = events[0]
     bookmakers = await odds_service.get_player_props("basketball_nba", event["id"])
-    props = odds_service.parse_player_props(bookmakers)
+    props = odds_service.parse_player_props(bookmakers, "basketball_nba")
     return {"event": event.get("id"), "bookmaker_count": len(bookmakers), "sample_props": dict(list(props.items())[:3])}

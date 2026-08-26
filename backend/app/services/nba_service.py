@@ -11,19 +11,11 @@ from nba_api.stats.endpoints import (
     playergamelog,
     boxscoretraditionalv2,
 )
+from app.services.cache_utils import make_cache
 
 CURRENT_SEASON = "2025-26"
-_cache: dict = {}
 CACHE_TTL = 3600  # 1 hour
-
-
-def _cached(key: str, fn, ttl: int = CACHE_TTL):
-    now = time.time()
-    if key in _cache and now - _cache[key]["ts"] < ttl:
-        return _cache[key]["data"]
-    data = fn()
-    _cache[key] = {"data": data, "ts": now}
-    return data
+_cached = make_cache(CACHE_TTL)
 
 
 def _get_all_game_scores() -> dict:

@@ -1,14 +1,13 @@
-import { useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
-import { predictionsApi, Sport } from '../services/api'
+import { predictionsApi } from '../services/api'
+import { useCurrentSport } from '../hooks/useCurrentSport'
 import { PREDICTION_STAT_CATEGORIES } from '../config/statColumns'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ConfidenceBadge from '../components/ConfidenceBadge'
 import clsx from 'clsx'
 
 export default function Predictions() {
-  const { sport } = useParams<{ sport: Sport }>()
-  const s = (sport ?? 'nba') as Sport
+  const { sport: s } = useCurrentSport()
   const { data, loading } = useApi(() => predictionsApi.getBestBets(s), [s])
   const bets = (data as any[]) ?? []
 

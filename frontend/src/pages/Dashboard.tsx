@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
-import { gamesApi, predictionsApi, recordApi, Sport } from '../services/api'
+import { gamesApi, predictionsApi, recordApi } from '../services/api'
+import { useCurrentSport } from '../hooks/useCurrentSport'
 import { SPORT_LABEL } from '../types/domain'
 import WinProbBar from '../components/WinProbBar'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -9,8 +9,7 @@ import { Link } from 'react-router-dom'
 import clsx from 'clsx'
 
 export default function Dashboard() {
-  const { sport } = useParams<{ sport: Sport }>()
-  const s = (sport ?? 'nba') as Sport
+  const { sport: s } = useCurrentSport()
   const { data: gamesData, loading: gamesLoading } = useApi(() => gamesApi.getToday(s), [s])
   const { data: bestBets, loading: betsLoading } = useApi(() => predictionsApi.getBestBets(s), [s])
   const { data: recordData, refetch: refetchRecord } = useApi(() => recordApi.get(s), [s])

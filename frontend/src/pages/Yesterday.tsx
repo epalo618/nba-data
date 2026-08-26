@@ -1,6 +1,6 @@
-import { useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
-import { predictionsApi, Sport } from '../services/api'
+import { predictionsApi } from '../services/api'
+import { useCurrentSport } from '../hooks/useCurrentSport'
 import { YESTERDAY_STAT_ORDER, YESTERDAY_STAT_LABEL } from '../config/statColumns'
 import LoadingSpinner from '../components/LoadingSpinner'
 import clsx from 'clsx'
@@ -55,8 +55,7 @@ function TeamColumn({ label, rows, statOrder, statLabel }: { label: string; rows
 }
 
 export default function Yesterday() {
-  const { sport } = useParams<{ sport: Sport }>()
-  const s = (sport ?? 'nba') as Sport
+  const { sport: s } = useCurrentSport()
   const statOrder = YESTERDAY_STAT_ORDER[s]
   const statLabel = YESTERDAY_STAT_LABEL[s]
   const { data, loading, error } = useApi(() => predictionsApi.getYesterday(s), [s])

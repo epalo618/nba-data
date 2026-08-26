@@ -74,6 +74,29 @@ export const DEFAULT_PLAYER_SORT: Record<Sport, string> = {
   soccer: '',
 }
 
+export interface SummaryCardConfig {
+  key: string
+  label: string
+  decimals?: number
+}
+
+// Drives GameMatchup's per-team summary cards (MatchupStatCards) — three
+// headline stats per sport, read straight off get_team_season_stats /
+// get_team_advanced_stats' keys.
+export const MATCHUP_SUMMARY_CARDS: Record<Sport, SummaryCardConfig[]> = {
+  nba: [
+    { key: 'PTS', label: 'PTS/G' },
+    { key: 'OFF_RATING', label: 'OFF RTG' },
+    { key: 'DEF_RATING', label: 'DEF RTG' },
+  ],
+  nfl: [
+    { key: 'PTS', label: 'PPG' },
+    { key: 'PTS_ALLOWED', label: 'PAPG' },
+    { key: 'YDS_PER_GAME', label: 'YDS/G' },
+  ],
+  soccer: [],
+}
+
 export interface PredictionStatCategory {
   key: string
   label: string

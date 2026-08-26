@@ -1,23 +1,14 @@
-import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import nflreadpy as nfl
+from app.services.cache_utils import make_cache
 
 # NFL uses a single-year season string, unlike NBA's "2025-26". Needs a manual
 # bump each September once nflverse has that season's data flowing.
 CURRENT_SEASON = 2025
 
-_cache: dict = {}
 CACHE_TTL = 3600  # 1 hour
-
-
-def _cached(key: str, fn, ttl: int = CACHE_TTL):
-    now = time.time()
-    if key in _cache and now - _cache[key]["ts"] < ttl:
-        return _cache[key]["data"]
-    data = fn()
-    _cache[key] = {"data": data, "ts": now}
-    return data
+_cached = make_cache(CACHE_TTL)
 
 
 # nflreadpy's load_teams() includes relocated/retired franchise rows (e.g. STL/LA
@@ -120,6 +111,13 @@ def get_team_season_stats(league: str | None = None):
     return _cached(f"team_season_stats_{CURRENT_SEASON}", fetch)
 
 
+def _team_stats_rows(season: int = CURRENT_SEASON) -> list[dict]:
+    """Raw per-team-per-game stat rows from nflreadpy, cached once and shared by
+    every caller that needs them (get_team_advanced_stats, get_opponent_stat_ranks)
+    instead of each re-fetching/re-parsing the whole season table independently."""
+    return _cached(f"raw_team_stats_{season}", lambda: nfl.load_team_stats(seasons=[season]).to_dicts())
+
+
 def get_team_advanced_stats(league: str | None = None):
     """NFL-appropriate 'advanced' stats: yards/game, turnovers/game, point differential.
     Deliberately uses different keys than NBA's OFF_RATING/DEF_RATING/NET_RATING/PACE —
@@ -127,7 +125,7 @@ def get_team_advanced_stats(league: str | None = None):
     def fetch():
         m = _team_id_map()
         ts_by_team: dict = {}
-        for row in nfl.load_team_stats(seasons=[CURRENT_SEASON]).to_dicts():
+        for row in _team_stats_rows():
             ts_by_team.setdefault(row["team"], []).append(row)
         results_by_team: dict = {}
         for r in _team_game_results():
@@ -201,7 +199,7 @@ def get_opponent_stat_ranks(league: str | None = None) -> dict:
     def fetch():
         m = _team_id_map()
         by_opp: dict = {}
-        for row in nfl.load_team_stats(seasons=[CURRENT_SEASON]).to_dicts():
+        for row in _team_stats_rows():
             opp = row.get("opponent_team")
             yds = (row.get("passing_yards") or 0) + (row.get("rushing_yards") or 0)
             by_opp.setdefault(opp, []).append(yds)

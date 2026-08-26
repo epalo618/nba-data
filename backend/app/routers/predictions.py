@@ -134,12 +134,13 @@ def get_best_bets(service=Depends(get_sport_service), predictions=Depends(get_pr
         for bet in best_bets:
             by_stat[bet["stat"]].append(bet)
 
-        stat_order = ["PTS", "REB", "AST", "FG3M", "BLK", "STL"]
+        # Pick one best bet per stat category that actually appears in the data —
+        # avoids hardcoding a per-sport stat list here (project_player_stats
+        # already returns the right stat keys for whichever sport this is).
         best_per_stat = []
-        for stat in stat_order:
-            group = sorted(by_stat.get(stat, []), key=lambda x: -x["gap"])
-            if group:
-                best_per_stat.append(group[0])
+        for stat, group in by_stat.items():
+            best = max(group, key=lambda x: x["gap"])
+            best_per_stat.append(best)
 
         # Sort the best-per-category list by gap so strongest signal shows first
         best_per_stat.sort(key=lambda x: -x["gap"])

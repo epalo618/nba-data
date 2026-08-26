@@ -19,8 +19,7 @@ STAT_TO_MARKET_NBA = {
     "BLK": "player_blocks",
 }
 
-# Best-effort mapping to The Odds API's documented NFL player-prop market keys —
-# verify against their docs before relying on it (Phase 8 follow-up).
+# Verified against The Odds API's betting-markets docs (2026-08-25).
 STAT_TO_MARKET_NFL = {
     "PASSING_YARDS": "player_pass_yds",
     "PASSING_TDS": "player_pass_tds",
@@ -38,6 +37,19 @@ BOOKMAKER_DISPLAY = {
     "betmgm": "BetMGM",
 }
 
+# The Odds API's sport_key strings are "{sport}_{league/competition}" (e.g.
+# "basketball_nba", "americanfootball_nfl") — dispatch the stat->market map off
+# the leading segment so this generalizes to new sports without touching callers.
+_STAT_TO_MARKET_BY_SPORT_PREFIX = {
+    "basketball": STAT_TO_MARKET_NBA,
+    "americanfootball": STAT_TO_MARKET_NFL,
+}
+
+
+def _stat_map_for_sport_key(sport_key: str | None) -> dict:
+    prefix = (sport_key or "").split("_", 1)[0]
+    return _STAT_TO_MARKET_BY_SPORT_PREFIX.get(prefix, STAT_TO_MARKET_NBA)
+
 
 async def get_events(sport_key: str) -> list[dict]:
     if not ODDS_API_KEY or not sport_key:
@@ -54,7 +66,7 @@ async def get_events(sport_key: str) -> list[dict]:
 async def get_player_props(sport_key: str, event_id: str) -> list[dict]:
     if not ODDS_API_KEY or not sport_key:
         return []
-    markets = ",".join(STAT_TO_MARKET_NBA.values())
+    markets = ",".join(_stat_map_for_sport_key(sport_key).values())
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             f"{ODDS_BASE_URL}/sports/{sport_key}/events/{event_id}/odds",
@@ -69,15 +81,16 @@ async def get_player_props(sport_key: str, event_id: str) -> list[dict]:
         return resp.json().get("bookmakers", []) if resp.status_code == 200 else []
 
 
-def parse_player_props(bookmakers: list[dict]) -> dict:
+def parse_player_props(bookmakers: list[dict], sport_key: str = "basketball_nba") -> dict:
     """Returns {player_name: {stat: {"line": float, "book": str}}}"""
+    stat_map = _stat_map_for_sport_key(sport_key)
     result: dict = {}
     for bm in bookmakers:
         book_key = bm.get("key", "")
         book_name = BOOKMAKER_DISPLAY.get(book_key, book_key)
         priority = BOOKMAKER_PRIORITY.index(book_key) if book_key in BOOKMAKER_PRIORITY else 99
         for market in bm.get("markets", []):
-            stat = next((s for s, m in STAT_TO_MARKET.items() if m == market["key"]), None)
+            stat = next((s for s, m in stat_map.items() if m == market["key"]), None)
             if not stat:
                 continue
             for outcome in market.get("outcomes", []):

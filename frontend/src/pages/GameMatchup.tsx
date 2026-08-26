@@ -1,6 +1,7 @@
 import { useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
-import { gamesApi, predictionsApi, teamsApi, Sport } from '../services/api'
+import { gamesApi, predictionsApi, teamsApi } from '../services/api'
+import { useCurrentSport } from '../hooks/useCurrentSport'
 import WinProbBar from '../components/WinProbBar'
 import PlayerPropRow from '../components/PlayerPropRow'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -9,8 +10,8 @@ import MatchupStatCards from '../components/matchup/MatchupStatCards'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 
 export default function GameMatchup() {
-  const { sport, homeId, awayId } = useParams<{ sport: Sport; homeId: string; awayId: string }>()
-  const s = (sport ?? 'nba') as Sport
+  const { homeId, awayId } = useParams<{ homeId: string; awayId: string }>()
+  const { sport: s } = useCurrentSport()
   const hId = Number(homeId)
   const aId = Number(awayId)
 

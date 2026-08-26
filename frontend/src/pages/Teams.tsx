@@ -1,14 +1,13 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
-import { teamsApi, Sport } from '../services/api'
+import { teamsApi } from '../services/api'
+import { useCurrentSport } from '../hooks/useCurrentSport'
 import { TEAM_COLUMNS } from '../config/statColumns'
 import SortableStatTable from '../components/SortableStatTable'
 import LoadingSpinner from '../components/LoadingSpinner'
 
 export default function Teams() {
-  const { sport } = useParams<{ sport: Sport }>()
-  const s = (sport ?? 'nba') as Sport
+  const { sport: s } = useCurrentSport()
   const COLS = TEAM_COLUMNS[s]
   const { data, loading } = useApi(() => teamsApi.getStats(s), [s])
   const [sort, setSort] = useState<string>('W_PCT')
