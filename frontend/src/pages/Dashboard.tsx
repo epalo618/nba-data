@@ -80,7 +80,7 @@ export default function Dashboard() {
 
               <div className="flex justify-between mt-3 text-sm border-t border-surface-border pt-3">
                 <div>
-                  <span className="text-gray-500">Proj Pts: </span>
+                  <span className="text-gray-500">{s === 'soccer' ? 'Proj Goals: ' : 'Proj Pts: '}</span>
                   <span className="text-white font-semibold">{Math.round(game.projected_total)}</span>
                 </div>
                 {game.over_under_line && (
@@ -107,7 +107,11 @@ export default function Dashboard() {
         <h2 className="text-xl font-bold text-white mb-1">Top Prop Signals</h2>
         <p className="text-gray-500 text-sm mb-4">Projections where the model diverges most from season averages.</p>
 
-        {betsLoading ? (
+        {s === 'soccer' ? (
+          <div className="bg-surface-card border border-surface-border rounded-xl p-8 text-center text-gray-500">
+            Player prop projections aren't available for soccer yet.
+          </div>
+        ) : betsLoading ? (
           <LoadingSpinner label="Calculating projections..." />
         ) : (
           <div className="bg-surface-card border border-surface-border rounded-xl overflow-hidden">

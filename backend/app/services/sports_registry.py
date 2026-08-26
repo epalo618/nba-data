@@ -1,18 +1,19 @@
-from app.services import nba_service, nfl_service
+from app.services import nba_service, nfl_service, soccer_service
 
-# Populated with a real module in a later phase (soccer in Phase 6).
 SPORT_SERVICES = {
     "nba": nba_service,
     "nfl": nfl_service,
+    "soccer": soccer_service,
 }
 
 PREDICTIONS_SERVICES: dict = {}  # populated below, after predictions_service is defined (avoids circular import)
 
 
 def _load_predictions_services():
-    from app.services import predictions_service, nfl_predictions_service
+    from app.services import predictions_service, nfl_predictions_service, soccer_predictions_service
     PREDICTIONS_SERVICES["nba"] = predictions_service
     PREDICTIONS_SERVICES["nfl"] = nfl_predictions_service
+    PREDICTIONS_SERVICES["soccer"] = soccer_predictions_service
 
 
 _load_predictions_services()
@@ -37,20 +38,17 @@ ODDS_SPORT_KEYS = {
     },
 }
 
-# API-Football league IDs + display info. Unused until Phase 6 (soccer backend) —
-# defined now so the registry shape is stable. 7 of 8 ids confirmed against
-# API-Football's public docs/coverage pages (2026-08-25); "mls" is a best-effort
-# placeholder (their site blocks scraping) — confirm it with a live GET
-# /leagues?search=MLS call once an API key exists, before relying on it.
+# Soccer runs on football-data.org (not API-Football — its free tier turned out
+# to only serve seasons 2022-2024, no current-season data at all). Europa League
+# and MLS aren't in football-data.org's free tier either, so only 6 competitions
+# are live for now. Codes verified against the live API (2026-08-25).
 SOCCER_LEAGUES = {
-    "epl": {"api_football_id": 39, "name": "Premier League", "country": "England"},
-    "laliga": {"api_football_id": 140, "name": "La Liga", "country": "Spain"},
-    "seriea": {"api_football_id": 135, "name": "Serie A", "country": "Italy"},
-    "bundesliga": {"api_football_id": 78, "name": "Bundesliga", "country": "Germany"},
-    "ligue1": {"api_football_id": 61, "name": "Ligue 1", "country": "France"},
-    "ucl": {"api_football_id": 2, "name": "Champions League", "country": "Europe"},
-    "uel": {"api_football_id": 3, "name": "Europa League", "country": "Europe"},
-    "mls": {"api_football_id": 253, "name": "MLS", "country": "USA"},  # unverified, see note above
+    "epl": {"name": "Premier League", "country": "England"},
+    "laliga": {"name": "La Liga", "country": "Spain"},
+    "seriea": {"name": "Serie A", "country": "Italy"},
+    "bundesliga": {"name": "Bundesliga", "country": "Germany"},
+    "ligue1": {"name": "Ligue 1", "country": "France"},
+    "ucl": {"name": "Champions League", "country": "Europe"},
 }
 
 

@@ -83,7 +83,11 @@ export default function Yesterday() {
         <p className="text-gray-500 text-sm">How the model's projections compared to actual player stats from the most recently completed games.</p>
       </div>
 
-      {loading ? (
+      {s === 'soccer' ? (
+        <div className="bg-surface-card border border-surface-border rounded-xl p-8 text-center text-gray-500">
+          Player-level stats aren't available for soccer yet.
+        </div>
+      ) : loading ? (
         <LoadingSpinner label="Loading settled game results..." />
       ) : error ? (
         <div className="bg-surface-card border border-red-900 rounded-xl p-8 text-center text-red-400">

@@ -10,6 +10,8 @@ const SPORTS: { key: Sport; label: string }[] = [
 ]
 
 // Mirrors backend/app/services/sports_registry.py's SOCCER_LEAGUES keys/names.
+// Europa League and MLS aren't in football-data.org's free tier, so they're
+// left out here too until that changes.
 const SOCCER_LEAGUES = [
   { key: 'epl', label: 'Premier League' },
   { key: 'laliga', label: 'La Liga' },
@@ -17,8 +19,6 @@ const SOCCER_LEAGUES = [
   { key: 'bundesliga', label: 'Bundesliga' },
   { key: 'ligue1', label: 'Ligue 1' },
   { key: 'ucl', label: 'Champions League' },
-  { key: 'uel', label: 'Europa League' },
-  { key: 'mls', label: 'MLS' },
 ]
 
 export default function SportSwitcher() {

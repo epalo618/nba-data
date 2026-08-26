@@ -35,8 +35,16 @@ export const TEAM_COLUMNS: Record<Sport, ColumnConfig[]> = {
     { key: 'TO_PER_GAME', label: 'TO/G' },
     { key: 'PT_DIFF', label: 'DIFF', signColor: true },
   ],
-  // Populated in Phase 6/7 (soccer backend/frontend).
-  soccer: [],
+  soccer: [
+    { key: 'W', label: 'W' },
+    { key: 'D', label: 'D' },
+    { key: 'L', label: 'L' },
+    { key: 'W_PCT', label: 'WIN%', percent: true },
+    { key: 'PTS_TOTAL', label: 'PTS' },
+    { key: 'GF', label: 'GF' },
+    { key: 'GA', label: 'GA' },
+    { key: 'GD', label: 'GD', signColor: true },
+  ],
 }
 
 export const PLAYER_COLUMNS: Record<Sport, ColumnConfig[]> = {
@@ -94,7 +102,11 @@ export const MATCHUP_SUMMARY_CARDS: Record<Sport, SummaryCardConfig[]> = {
     { key: 'PTS_ALLOWED', label: 'PAPG' },
     { key: 'YDS_PER_GAME', label: 'YDS/G' },
   ],
-  soccer: [],
+  soccer: [
+    { key: 'GF_PER_GAME', label: 'GF/G' },
+    { key: 'GA_PER_GAME', label: 'GA/G' },
+    { key: 'PTS_PER_GAME', label: 'PTS/G' },
+  ],
 }
 
 export interface PredictionStatCategory {

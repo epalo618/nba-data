@@ -28,7 +28,11 @@ export default function Predictions() {
         </div>
       </div>
 
-      {loading ? (
+      {s === 'soccer' ? (
+        <div className="bg-surface-card border border-surface-border rounded-xl p-8 text-center text-gray-500">
+          Player prop projections aren't available for soccer yet — check the Games page for match-level predictions.
+        </div>
+      ) : loading ? (
         <LoadingSpinner label="Calculating today's best bets..." />
       ) : (
         <div className="space-y-8">

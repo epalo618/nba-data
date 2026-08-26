@@ -7,7 +7,6 @@ import Games from './pages/Games'
 import GameMatchup from './pages/GameMatchup'
 import Predictions from './pages/Predictions'
 import Yesterday from './pages/Yesterday'
-import ComingSoon from './pages/ComingSoon'
 
 export default function App() {
   return (
@@ -18,19 +17,17 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Navigate to="/nba" replace />} />
 
-            {/* Soccer isn't wired up on the backend yet (Phase 6) — these literal
-                routes outrank the generic /:sport/* routes below so they show a
-                placeholder instead of hitting real pages that would 404. NFL was
-                the same until Phase 5 (its backend landed in Phase 4); it now
-                falls through to the real pages below like NBA does. */}
-            <Route path="/soccer" element={<ComingSoon />} />
-            <Route path="/soccer/:league" element={<ComingSoon />} />
-            <Route path="/soccer/:league/teams" element={<ComingSoon />} />
-            <Route path="/soccer/:league/players" element={<ComingSoon />} />
-            <Route path="/soccer/:league/games" element={<ComingSoon />} />
-            <Route path="/soccer/:league/games/:homeId/vs/:awayId" element={<ComingSoon />} />
-            <Route path="/soccer/:league/predictions" element={<ComingSoon />} />
-            <Route path="/soccer/:league/yesterday" element={<ComingSoon />} />
+            {/* Soccer's URLs carry an extra :league segment, so they need their
+                own routes rather than falling through to the generic /:sport/*
+                ones below (which only ever match a single path segment). */}
+            <Route path="/soccer" element={<Navigate to="/soccer/epl" replace />} />
+            <Route path="/soccer/:league" element={<Dashboard />} />
+            <Route path="/soccer/:league/teams" element={<Teams />} />
+            <Route path="/soccer/:league/players" element={<Players />} />
+            <Route path="/soccer/:league/games" element={<Games />} />
+            <Route path="/soccer/:league/games/:homeId/vs/:awayId" element={<GameMatchup />} />
+            <Route path="/soccer/:league/predictions" element={<Predictions />} />
+            <Route path="/soccer/:league/yesterday" element={<Yesterday />} />
 
             <Route path="/:sport" element={<Dashboard />} />
             <Route path="/:sport/teams" element={<Teams />} />
