@@ -102,25 +102,44 @@ def get_player_season_stats(league: str | None = None):
     return []
 
 
+def _season_in_progress(data: dict) -> bool:
+    """football-data.org keeps serving the last completed season's standings
+    (fully played out, e.g. UCL's league phase already finished in May) until
+    the next season is created on their end — there's no way to distinguish
+    "current season" from "most recent season" except by checking today falls
+    within its start/end dates. Used to zero out stale stats once a season is
+    over and the next one hasn't started yet."""
+    season = data.get("season") or {}
+    start, end = season.get("startDate"), season.get("endDate")
+    if not start or not end:
+        return True
+    today = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
+    return start <= today <= end
+
+
 def get_team_season_stats(league: str | None = None):
     def fetch_one(lg: str):
         code = _code(lg)
         def fetch():
             data = _get(f"/competitions/{code}/standings")
+            active = _season_in_progress(data)
             out = []
             for group in data.get("standings", []):
                 if group.get("type") != "TOTAL":
                     continue
                 for row in group.get("table", []):
-                    gp = row.get("playedGames", 0)
+                    gp = row.get("playedGames", 0) if active else 0
                     out.append({
                         "TEAM_ID": row["team"]["id"],
                         "TEAM_NAME": row["team"]["name"],
                         "LEAGUE": LEAGUE_NAMES[lg],
-                        "GP": gp, "W": row.get("won", 0), "D": row.get("draw", 0), "L": row.get("lost", 0),
-                        "W_PCT": round(row.get("won", 0) / gp, 3) if gp else 0,
-                        "PTS_TOTAL": row.get("points", 0),
-                        "GF": row.get("goalsFor", 0), "GA": row.get("goalsAgainst", 0), "GD": row.get("goalDifference", 0),
+                        "GP": gp, "W": row.get("won", 0) if active else 0,
+                        "D": row.get("draw", 0) if active else 0, "L": row.get("lost", 0) if active else 0,
+                        "W_PCT": round(row.get("won", 0) / gp, 3) if (active and gp) else 0,
+                        "PTS_TOTAL": row.get("points", 0) if active else 0,
+                        "GF": row.get("goalsFor", 0) if active else 0,
+                        "GA": row.get("goalsAgainst", 0) if active else 0,
+                        "GD": row.get("goalDifference", 0) if active else 0,
                     })
             return out
         return _cached(f"standings_{code}", fetch)
@@ -141,6 +160,7 @@ def get_team_advanced_stats(league: str | None = None):
             gp = row["GP"] or 1
             out.append({
                 "TEAM_ID": row["TEAM_ID"],
+                "LEAGUE": row["LEAGUE"],
                 "GF_PER_GAME": round(row["GF"] / gp, 2),
                 "GA_PER_GAME": round(row["GA"] / gp, 2),
                 "PTS_PER_GAME": round(row["PTS_TOTAL"] / gp, 2) if row["GP"] else 0,
@@ -195,12 +215,25 @@ def get_todays_games(league: str | None = None):
     return get_games_for_date(today, league=league)
 
 
+def _competition_active(code: str) -> bool:
+    """Whether `code`'s current season (per football-data.org) is actually in
+    progress right now, vs. stale data left over from the last completed
+    season (e.g. UCL's league phase already finished in May, next one hasn't
+    started). Cached under its own key — "standings_{code}" is already used by
+    get_team_season_stats for the *parsed* (list-shaped) result, not the raw
+    API response this needs."""
+    data = _cached(f"standings_raw_{code}", lambda: _get(f"/competitions/{code}/standings"))
+    return _season_in_progress(data)
+
+
 def get_team_last_n_games(team_id: int, n: int = 10, league: str | None = None):
     # "all" (and any team playing in a cup alongside its domestic league) both
     # want matches across every competition that team plays in, so omit the
     # competitions filter rather than trying to guess which single league the
     # team "belongs to".
     code = None if league == ALL_LEAGUES else _code(league)
+    if code and not _competition_active(code):
+        return []
     def fetch():
         params = {"status": "FINISHED", "limit": n}
         if code:
@@ -219,6 +252,8 @@ def get_team_last_n_games(team_id: int, n: int = 10, league: str | None = None):
 
 def get_head_to_head(team_id: int, opp_team_id: int, league: str | None = None) -> dict:
     code = None if league == ALL_LEAGUES else _code(league)
+    if code and not _competition_active(code):
+        return {"team_wins": 0, "opp_wins": 0, "games_played": 0}
     def fetch():
         # get_team_last_n_games's row shape doesn't carry opponent id, so fetch
         # match detail directly here rather than reusing (and duplicating) that call.
