@@ -5,39 +5,34 @@ export type { Sport }
 
 const api = axios.create({ baseURL: import.meta.env.VITE_API_URL ?? '/api' })
 
-// Appends ?league=xxx when a league is given (soccer only) — kept as a tiny
-// helper so every call site doesn't repeat the same ternary.
-const lg = (league?: string) => (league ? `?league=${league}` : '')
-const lgAmp = (league?: string) => (league ? `&league=${league}` : '')
-
 export const teamsApi = {
-  getAll: (sport: Sport, league?: string) => api.get(`/${sport}/teams/${lg(league)}`),
-  getStats: (sport: Sport, league?: string) => api.get(`/${sport}/teams/stats${lg(league)}`),
-  getGamelog: (sport: Sport, teamId: number, n = 10, league?: string) =>
-    api.get(`/${sport}/teams/${teamId}/gamelog?n=${n}${lgAmp(league)}`),
+  getAll: (sport: Sport) => api.get(`/${sport}/teams/`),
+  getStats: (sport: Sport) => api.get(`/${sport}/teams/stats`),
+  getGamelog: (sport: Sport, teamId: number, n = 10) =>
+    api.get(`/${sport}/teams/${teamId}/gamelog?n=${n}`),
 }
 
 export const playersApi = {
-  getAll: (sport: Sport, league?: string) => api.get(`/${sport}/players/${lg(league)}`),
-  getStats: (sport: Sport, teamId?: number, league?: string) =>
-    api.get(`/${sport}/players/stats` + (teamId ? `?team_id=${teamId}${lgAmp(league)}` : lg(league))),
-  getGamelog: (sport: Sport, playerId: string | number, n = 10, league?: string) =>
-    api.get(`/${sport}/players/${playerId}/gamelog?n=${n}${lgAmp(league)}`),
+  getAll: (sport: Sport) => api.get(`/${sport}/players/`),
+  getStats: (sport: Sport, teamId?: number) =>
+    api.get(`/${sport}/players/stats` + (teamId ? `?team_id=${teamId}` : '')),
+  getGamelog: (sport: Sport, playerId: string | number, n = 10) =>
+    api.get(`/${sport}/players/${playerId}/gamelog?n=${n}`),
 }
 
 export const gamesApi = {
-  getToday: (sport: Sport, league?: string) => api.get(`/${sport}/games/today${lg(league)}`),
-  getMatchup: (sport: Sport, homeId: number, awayId: number, league?: string) =>
-    api.get(`/${sport}/games/${homeId}/vs/${awayId}${lg(league)}`),
+  getToday: (sport: Sport) => api.get(`/${sport}/games/today`),
+  getMatchup: (sport: Sport, homeId: number, awayId: number) =>
+    api.get(`/${sport}/games/${homeId}/vs/${awayId}`),
 }
 
 export const predictionsApi = {
-  getPlayerProjections: (sport: Sport, playerId: string | number, opponentTeamId: number, league?: string) =>
-    api.get(`/${sport}/predictions/player/${playerId}/vs/${opponentTeamId}${lg(league)}`),
-  getGamePlayerProjections: (sport: Sport, homeId: number, awayId: number, topN = 8, league?: string) =>
-    api.get(`/${sport}/predictions/game/${homeId}/vs/${awayId}/players?top_n=${topN}${lgAmp(league)}`),
-  getBestBets: (sport: Sport, league?: string) => api.get(`/${sport}/predictions/best-bets${lg(league)}`),
-  getYesterday: (sport: Sport, league?: string) => api.get(`/${sport}/predictions/yesterday${lg(league)}`),
+  getPlayerProjections: (sport: Sport, playerId: string | number, opponentTeamId: number) =>
+    api.get(`/${sport}/predictions/player/${playerId}/vs/${opponentTeamId}`),
+  getGamePlayerProjections: (sport: Sport, homeId: number, awayId: number, topN = 8) =>
+    api.get(`/${sport}/predictions/game/${homeId}/vs/${awayId}/players?top_n=${topN}`),
+  getBestBets: (sport: Sport) => api.get(`/${sport}/predictions/best-bets`),
+  getYesterday: (sport: Sport) => api.get(`/${sport}/predictions/yesterday`),
 }
 
 export const recordApi = {

@@ -3,15 +3,14 @@ import { gamesApi, predictionsApi } from '../services/api'
 import { useCurrentSport } from '../hooks/useCurrentSport'
 import { SPORT_LABEL } from '../types/domain'
 import WinProbBar from '../components/WinProbBar'
-import WinProbBar3Way from '../components/WinProbBar3Way'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { Link } from 'react-router-dom'
 import clsx from 'clsx'
 
 export default function Dashboard() {
-  const { sport: s, league } = useCurrentSport()
-  const { data: gamesData, loading: gamesLoading } = useApi(() => gamesApi.getToday(s, league), [s, league])
-  const { data: bestBets, loading: betsLoading } = useApi(() => predictionsApi.getBestBets(s, league), [s, league])
+  const { sport: s } = useCurrentSport()
+  const { data: gamesData, loading: gamesLoading } = useApi(() => gamesApi.getToday(s), [s])
+  const { data: bestBets, loading: betsLoading } = useApi(() => predictionsApi.getBestBets(s), [s])
 
   const games = (gamesData as any)?.games ?? []
 
@@ -43,9 +42,6 @@ export default function Dashboard() {
                 </div>
                 <div className="text-center">
                   <div className="text-brand font-bold text-lg">vs</div>
-                  {game.LEAGUE && (
-                    <div className="text-xs text-gray-500 mt-0.5">{game.LEAGUE}</div>
-                  )}
                   {game.h2h_games_played > 0 && (
                     <div className="text-xs text-gray-500 mt-0.5">
                       H2H {game.h2h_away_wins}-{game.h2h_home_wins}
@@ -59,22 +55,12 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {s === 'soccer' ? (
-                <WinProbBar3Way
-                  homeTeam={game.home_team_name?.split(' ').pop() ?? ''}
-                  awayTeam={game.away_team_name?.split(' ').pop() ?? ''}
-                  homeProb={game.home_win_prob ?? 0.33}
-                  drawProb={game.draw_prob ?? 0.34}
-                  awayProb={game.away_win_prob ?? 0.33}
-                />
-              ) : (
-                <WinProbBar
-                  homeTeam={game.home_team_name?.split(' ').pop() ?? ''}
-                  awayTeam={game.away_team_name?.split(' ').pop() ?? ''}
-                  homeProb={game.home_win_prob ?? 0.5}
-                  awayProb={game.away_win_prob ?? 0.5}
-                />
-              )}
+              <WinProbBar
+                homeTeam={game.home_team_name?.split(' ').pop() ?? ''}
+                awayTeam={game.away_team_name?.split(' ').pop() ?? ''}
+                homeProb={game.home_win_prob ?? 0.5}
+                awayProb={game.away_win_prob ?? 0.5}
+              />
 
               {game.favored_team && (
                 <div className="mt-3 mb-1">
@@ -94,7 +80,7 @@ export default function Dashboard() {
 
               <div className="flex justify-between mt-3 text-sm border-t border-surface-border pt-3">
                 <div>
-                  <span className="text-gray-500">{s === 'soccer' ? 'Proj Goals: ' : 'Proj Pts: '}</span>
+                  <span className="text-gray-500">Proj Pts: </span>
                   <span className="text-white font-semibold">{Math.round(game.projected_total)}</span>
                 </div>
                 {game.over_under_line && (
@@ -121,11 +107,7 @@ export default function Dashboard() {
         <h2 className="text-xl font-bold text-white mb-1">Top Prop Signals</h2>
         <p className="text-gray-500 text-sm mb-4">Projections where the model diverges most from season averages.</p>
 
-        {s === 'soccer' ? (
-          <div className="bg-surface-card border border-surface-border rounded-xl p-8 text-center text-gray-500">
-            Player prop projections aren't available for soccer yet.
-          </div>
-        ) : betsLoading ? (
+        {betsLoading ? (
           <LoadingSpinner label="Calculating projections..." />
         ) : (
           <div className="bg-surface-card border border-surface-border rounded-xl overflow-hidden">

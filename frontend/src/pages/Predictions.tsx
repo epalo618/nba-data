@@ -7,8 +7,8 @@ import ConfidenceBadge from '../components/ConfidenceBadge'
 import clsx from 'clsx'
 
 export default function Predictions() {
-  const { sport: s, league } = useCurrentSport()
-  const { data, loading } = useApi(() => predictionsApi.getBestBets(s, league), [s, league])
+  const { sport: s } = useCurrentSport()
+  const { data, loading } = useApi(() => predictionsApi.getBestBets(s), [s])
   const bets = (data as any[]) ?? []
 
   const categories = PREDICTION_STAT_CATEGORIES[s].map(cat => ({
@@ -28,11 +28,7 @@ export default function Predictions() {
         </div>
       </div>
 
-      {s === 'soccer' ? (
-        <div className="bg-surface-card border border-surface-border rounded-xl p-8 text-center text-gray-500">
-          Player prop projections aren't available for soccer yet — check the Games page for match-level predictions.
-        </div>
-      ) : loading ? (
+      {loading ? (
         <LoadingSpinner label="Calculating today's best bets..." />
       ) : (
         <div className="space-y-8">

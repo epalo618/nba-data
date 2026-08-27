@@ -13,8 +13,8 @@ const SUBLINKS = [
 ]
 
 export default function Navbar() {
-  const { sport: s, league } = useCurrentSport()
-  const base = s === 'soccer' ? `/soccer/${league ?? 'epl'}` : `/${s}`
+  const { sport: s } = useCurrentSport()
+  const base = `/${s}`
 
   return (
     <nav className="bg-surface-card border-b border-surface-border sticky top-0 z-50">

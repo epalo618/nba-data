@@ -1,9 +1,8 @@
-export type Sport = 'nba' | 'nfl' | 'soccer'
+export type Sport = 'nba' | 'nfl'
 
 export const SPORT_LABEL: Record<Sport, string> = {
   nba: 'NBA',
   nfl: 'NFL',
-  soccer: 'Soccer',
 }
 
 export interface Team {
@@ -25,7 +24,6 @@ export interface GameSummary {
   away_team_name: string
   home_win_prob?: number
   away_win_prob?: number
-  draw_prob?: number
   favored_team?: string | null
   projected_total?: number
 }
@@ -33,7 +31,6 @@ export interface GameSummary {
 export interface WinProbability {
   home_win_prob: number
   away_win_prob: number
-  draw_prob?: number
   favored_team?: string | null
   reasons?: string[]
   factors?: Record<string, number>

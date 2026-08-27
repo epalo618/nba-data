@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from app.services import supabase_service
 from app.dependencies import get_sport_service, get_predictions_service
@@ -55,10 +55,10 @@ def submit_result(sport: str, result: GameResult):
 
 
 @router.get("/debug")
-def debug_sync(sport: str, service=Depends(get_sport_service), predictions=Depends(get_predictions_service), league: str | None = Query(None)):
+def debug_sync(sport: str, service=Depends(get_sport_service), predictions=Depends(get_predictions_service)):
     """Show what the sync endpoint would submit, without writing anything."""
     try:
-        all_teams = {t["id"]: t for t in service.get_all_teams(league=league)}
+        all_teams = {t["id"]: t for t in service.get_all_teams()}
         eastern = ZoneInfo("America/New_York")
         today_str = datetime.now(eastern).strftime("%Y-%m-%d")
         yesterday_str = (datetime.now(eastern) - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -66,7 +66,7 @@ def debug_sync(sport: str, service=Depends(get_sport_service), predictions=Depen
         output = []
         for date_str in [yesterday_str, today_str]:
             try:
-                data = service.get_games_for_date(date_str, league=league)
+                data = service.get_games_for_date(date_str)
                 games = data.get("games", [])
                 for game in games:
                     home_id = game.get("HOME_TEAM_ID")
@@ -87,7 +87,7 @@ def debug_sync(sport: str, service=Depends(get_sport_service), predictions=Depen
                     }
                     if game.get("GAME_STATUS_ID") == 3 and home_id and away_id:
                         try:
-                            wp = predictions.calculate_win_probability(home_id, away_id, home_name, away_name, league=league)
+                            wp = predictions.calculate_win_probability(home_id, away_id, home_name, away_name)
                             entry["predicted_winner"] = wp.get("favored_team")
                             hs = game.get("HOME_SCORE", 0)
                             vs = game.get("VISITOR_SCORE", 0)
@@ -106,11 +106,11 @@ def debug_sync(sport: str, service=Depends(get_sport_service), predictions=Depen
 
 
 @router.post("/sync")
-def sync_record(sport: str, service=Depends(get_sport_service), predictions=Depends(get_predictions_service), league: str | None = Query(None)):
+def sync_record(sport: str, service=Depends(get_sport_service), predictions=Depends(get_predictions_service)):
     """Auto-submit completed games from the last 7 days using LeagueGameLog."""
     try:
         from collections import defaultdict
-        all_teams = {t["id"]: t for t in service.get_all_teams(league=league)}
+        all_teams = {t["id"]: t for t in service.get_all_teams()}
         submitted = []
 
         eastern = ZoneInfo("America/New_York")
@@ -121,7 +121,7 @@ def sync_record(sport: str, service=Depends(get_sport_service), predictions=Depe
         ]
 
         for date_str in dates:
-            rows = service.get_team_game_results_for_date(date_str, league=league)
+            rows = service.get_team_game_results_for_date(date_str)
             if not rows:
                 continue
 
@@ -149,7 +149,7 @@ def sync_record(sport: str, service=Depends(get_sport_service), predictions=Depe
                 actual = home_name if home_row.get("WL") == "W" else away_name
 
                 try:
-                    win_probs = predictions.calculate_win_probability(home_id, away_id, home_name, away_name, league=league)
+                    win_probs = predictions.calculate_win_probability(home_id, away_id, home_name, away_name)
                 except Exception:
                     continue
 
@@ -205,7 +205,7 @@ def get_points_record_history(sport: str):
 
 
 @router.get("/points/debug")
-def debug_points_sync(sport: str, service=Depends(get_sport_service), predictions=Depends(get_predictions_service), league: str | None = Query(None)):
+def debug_points_sync(sport: str, service=Depends(get_sport_service), predictions=Depends(get_predictions_service)):
     """Show what the points sync would submit, without writing anything."""
     try:
         from collections import defaultdict
@@ -218,7 +218,7 @@ def debug_points_sync(sport: str, service=Depends(get_sport_service), prediction
 
         output = []
         for date_str in dates:
-            rows = service.get_team_game_results_for_date(date_str, league=league)
+            rows = service.get_team_game_results_for_date(date_str)
             if not rows:
                 output.append({"date": date_str, "note": "no rows returned"})
                 continue
@@ -260,7 +260,7 @@ def debug_points_sync(sport: str, service=Depends(get_sport_service), prediction
                     continue
 
                 try:
-                    proj_total = float(predictions.calculate_projected_total(home_id, away_id, league=league))
+                    proj_total = float(predictions.calculate_projected_total(home_id, away_id))
                     entry["proj_total"] = proj_total
                     entry["correct"] = actual_total >= proj_total
                 except Exception as ex:
@@ -279,7 +279,7 @@ def debug_points_sync(sport: str, service=Depends(get_sport_service), prediction
 
 
 @router.post("/points/sync")
-def sync_points_record(sport: str, service=Depends(get_sport_service), predictions=Depends(get_predictions_service), league: str | None = Query(None)):
+def sync_points_record(sport: str, service=Depends(get_sport_service), predictions=Depends(get_predictions_service)):
     """Auto-submit completed games' projected vs actual total points from last 7 days."""
     try:
         from collections import defaultdict
@@ -293,7 +293,7 @@ def sync_points_record(sport: str, service=Depends(get_sport_service), predictio
         ]
 
         for date_str in dates:
-            rows = service.get_team_game_results_for_date(date_str, league=league)
+            rows = service.get_team_game_results_for_date(date_str)
             if not rows:
                 continue
 
@@ -320,7 +320,7 @@ def sync_points_record(sport: str, service=Depends(get_sport_service), predictio
                     continue
 
                 try:
-                    proj_total = float(predictions.calculate_projected_total(home_id, away_id, league=league))
+                    proj_total = float(predictions.calculate_projected_total(home_id, away_id))
                 except Exception as ex:
                     errors.append({"game_id": str(game_id), "error": f"proj_total: {ex}"})
                     continue

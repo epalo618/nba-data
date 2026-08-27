@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends
 from app.services import odds_service
 from app.services.sports_registry import resolve_odds_sport_key
 from app.dependencies import get_sport_service, get_predictions_service
@@ -11,10 +11,9 @@ async def get_todays_games(
     sport: str,
     service=Depends(get_sport_service),
     predictions=Depends(get_predictions_service),
-    league: str | None = Query(None),
 ):
     try:
-        data = service.get_todays_games(league=league)
+        data = service.get_todays_games()
         games = data["games"]
         line_score = data["line_score"]
 
@@ -22,12 +21,12 @@ async def get_todays_games(
         calculate_projected_total = predictions.calculate_projected_total
 
         # Fetch odds
-        sport_key = resolve_odds_sport_key(sport, league)
+        sport_key = resolve_odds_sport_key(sport)
         raw_odds = await odds_service.get_odds(sport_key)
         odds_map = odds_service.parse_odds(raw_odds)
 
         # Get team stats for name lookup
-        all_teams = {t["id"]: t for t in service.get_all_teams(league=league)}
+        all_teams = {t["id"]: t for t in service.get_all_teams()}
 
         enriched = []
         for game in games:
@@ -42,14 +41,14 @@ async def get_todays_games(
             away_name = away_info.get("full_name") or f"{game.get('VISITOR_TEAM_CITY', '')} {game.get('VISITOR_TEAM_NAME', '')}".strip()
 
             try:
-                win_probs = calculate_win_probability(home_id, away_id, home_name, away_name, league=league)
-                proj_total = calculate_projected_total(home_id, away_id, league=league)
+                win_probs = calculate_win_probability(home_id, away_id, home_name, away_name)
+                proj_total = calculate_projected_total(home_id, away_id)
             except Exception:
                 win_probs = {"home_win_prob": 0.5, "away_win_prob": 0.5, "favored_team": None, "reasons": [], "factors": {}}
                 proj_total = 220.0
 
             try:
-                h2h = service.get_head_to_head(home_id, away_id, league=league)
+                h2h = service.get_head_to_head(home_id, away_id)
             except Exception:
                 h2h = {"team_wins": 0, "opp_wins": 0, "games_played": 0}
 
@@ -69,7 +68,6 @@ async def get_todays_games(
                 "away_team_name": away_name,
                 "home_win_prob": win_probs["home_win_prob"],
                 "away_win_prob": win_probs["away_win_prob"],
-                "draw_prob": win_probs.get("draw_prob"),
                 "favored_team": win_probs.get("favored_team"),
                 "win_reasons": win_probs.get("reasons", []),
                 "win_prob_factors": win_probs["factors"],
@@ -94,16 +92,15 @@ async def get_matchup(
     sport: str,
     service=Depends(get_sport_service),
     predictions=Depends(get_predictions_service),
-    league: str | None = Query(None),
 ):
     try:
-        all_teams = {t["id"]: t for t in service.get_all_teams(league=league)}
+        all_teams = {t["id"]: t for t in service.get_all_teams()}
         home_name = all_teams.get(home_team_id, {}).get("full_name", f"Team {home_team_id}")
         away_name = all_teams.get(away_team_id, {}).get("full_name", f"Team {away_team_id}")
-        win_probs = predictions.calculate_win_probability(home_team_id, away_team_id, home_name, away_name, league=league)
-        proj_total = predictions.calculate_projected_total(home_team_id, away_team_id, league=league)
-        home_log = service.get_team_last_n_games(home_team_id, 10, league=league)
-        away_log = service.get_team_last_n_games(away_team_id, 10, league=league)
+        win_probs = predictions.calculate_win_probability(home_team_id, away_team_id, home_name, away_name)
+        proj_total = predictions.calculate_projected_total(home_team_id, away_team_id)
+        home_log = service.get_team_last_n_games(home_team_id, 10)
+        away_log = service.get_team_last_n_games(away_team_id, 10)
         home_pts = [g.get("PTS", 0) for g in home_log]
         away_pts = [g.get("PTS", 0) for g in away_log]
         home_allowed = [g.get("PTS_ALLOWED", 0) for g in home_log]

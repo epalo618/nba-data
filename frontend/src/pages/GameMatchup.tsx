@@ -3,26 +3,24 @@ import { useApi } from '../hooks/useApi'
 import { gamesApi, predictionsApi, teamsApi } from '../services/api'
 import { useCurrentSport } from '../hooks/useCurrentSport'
 import WinProbBar from '../components/WinProbBar'
-import WinProbBar3Way from '../components/WinProbBar3Way'
 import PlayerPropRow from '../components/PlayerPropRow'
 import LoadingSpinner from '../components/LoadingSpinner'
 import StatCard from '../components/StatCard'
 import MatchupStatCards from '../components/matchup/MatchupStatCards'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
-import clsx from 'clsx'
 
 export default function GameMatchup() {
   const { homeId, awayId } = useParams<{ homeId: string; awayId: string }>()
-  const { sport: s, league } = useCurrentSport()
+  const { sport: s } = useCurrentSport()
   const hId = Number(homeId)
   const aId = Number(awayId)
 
-  const { data: matchup, loading: mLoading } = useApi(() => gamesApi.getMatchup(s, hId, aId, league), [s, hId, aId, league])
+  const { data: matchup, loading: mLoading } = useApi(() => gamesApi.getMatchup(s, hId, aId), [s, hId, aId])
   const { data: playerProjs, loading: pLoading } = useApi(
-    () => predictionsApi.getGamePlayerProjections(s, hId, aId, 8, league),
-    [s, hId, aId, league]
+    () => predictionsApi.getGamePlayerProjections(s, hId, aId, 8),
+    [s, hId, aId]
   )
-  const { data: allTeamStats } = useApi(() => teamsApi.getStats(s, league), [s, league])
+  const { data: allTeamStats } = useApi(() => teamsApi.getStats(s), [s])
 
   const m = matchup as any
   const pp = playerProjs as any
@@ -60,32 +58,19 @@ export default function GameMatchup() {
           <h1 className="text-2xl font-bold text-white">{homeName} <span className="text-gray-500">vs</span> {awayName}</h1>
           <p className="text-gray-500 text-sm mt-1">Game Day Matchup Analysis</p>
         </div>
-        {s === 'soccer' ? (
-          <WinProbBar3Way
-            homeTeam={homeName}
-            awayTeam={awayName}
-            homeProb={winProb.home_win_prob ?? 0.33}
-            drawProb={winProb.draw_prob ?? 0.34}
-            awayProb={winProb.away_win_prob ?? 0.33}
-          />
-        ) : (
-          <WinProbBar
-            homeTeam={homeName}
-            awayTeam={awayName}
-            homeProb={winProb.home_win_prob ?? 0.5}
-            awayProb={winProb.away_win_prob ?? 0.5}
-          />
-        )}
-        <div className={clsx('grid grid-cols-2 gap-4 mt-6', s === 'soccer' ? 'md:grid-cols-5' : 'md:grid-cols-4')}>
-          <StatCard label={s === 'soccer' ? 'Projected Goals' : 'Projected Total'} value={m?.projected_total ?? '—'} />
+        <WinProbBar
+          homeTeam={homeName}
+          awayTeam={awayName}
+          homeProb={winProb.home_win_prob ?? 0.5}
+          awayProb={winProb.away_win_prob ?? 0.5}
+        />
+        <div className="grid grid-cols-2 gap-4 mt-6 md:grid-cols-4">
+          <StatCard label="Projected Total" value={m?.projected_total ?? '—'} />
           <StatCard label="Home Win Prob" value={`${Math.round((winProb.home_win_prob ?? 0.5) * 100)}%`} color="text-brand" />
-          {s === 'soccer' && (
-            <StatCard label="Draw Prob" value={`${Math.round((winProb.draw_prob ?? 0) * 100)}%`} color="text-brand" />
-          )}
           <StatCard label="Away Win Prob" value={`${Math.round((winProb.away_win_prob ?? 0.5) * 100)}%`} color="text-brand" />
           <StatCard
             label="Projected Winner"
-            value={winProb.favored_team ?? (s === 'soccer' ? 'Too close to call' : ((winProb.home_win_prob ?? 0.5) >= 0.5 ? homeName.split(' ').pop()! : awayName.split(' ').pop()!))}
+            value={winProb.favored_team ?? ((winProb.home_win_prob ?? 0.5) >= 0.5 ? homeName.split(' ').pop()! : awayName.split(' ').pop()!)}
             color="text-green-400"
           />
         </div>
@@ -128,11 +113,7 @@ export default function GameMatchup() {
 
       <div>
         <h2 className="text-xl font-bold text-white mb-4">Player Prop Projections</h2>
-        {s === 'soccer' ? (
-          <div className="bg-surface-card border border-surface-border rounded-xl p-8 text-center text-gray-500">
-            Player-level stats aren't available for soccer yet.
-          </div>
-        ) : pLoading ? <LoadingSpinner label="Projecting player props..." /> : (
+        {pLoading ? <LoadingSpinner label="Projecting player props..." /> : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {[
               { label: homeName, players: pp?.home_players ?? [] },

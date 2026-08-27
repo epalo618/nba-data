@@ -55,10 +55,10 @@ function TeamColumn({ label, rows, statOrder, statLabel }: { label: string; rows
 }
 
 export default function Yesterday() {
-  const { sport: s, league } = useCurrentSport()
+  const { sport: s } = useCurrentSport()
   const statOrder = YESTERDAY_STAT_ORDER[s]
   const statLabel = YESTERDAY_STAT_LABEL[s]
-  const { data, loading, error } = useApi(() => predictionsApi.getYesterday(s, league), [s, league])
+  const { data, loading, error } = useApi(() => predictionsApi.getYesterday(s), [s])
   const rows = (data as any[]) ?? []
 
   const correct = rows.filter(r => r.correct).length
@@ -83,11 +83,7 @@ export default function Yesterday() {
         <p className="text-gray-500 text-sm">How the model's projections compared to actual player stats from the most recently completed games.</p>
       </div>
 
-      {s === 'soccer' ? (
-        <div className="bg-surface-card border border-surface-border rounded-xl p-8 text-center text-gray-500">
-          Player-level stats aren't available for soccer yet.
-        </div>
-      ) : loading ? (
+      {loading ? (
         <LoadingSpinner label="Loading settled game results..." />
       ) : error ? (
         <div className="bg-surface-card border border-red-900 rounded-xl p-8 text-center text-red-400">

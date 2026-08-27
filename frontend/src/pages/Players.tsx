@@ -7,9 +7,9 @@ import SortableStatTable from '../components/SortableStatTable'
 import LoadingSpinner from '../components/LoadingSpinner'
 
 export default function Players() {
-  const { sport: s, league } = useCurrentSport()
+  const { sport: s } = useCurrentSport()
   const COLS = PLAYER_COLUMNS[s]
-  const { data, loading } = useApi(() => playersApi.getStats(s, undefined, league), [s, league])
+  const { data, loading } = useApi(() => playersApi.getStats(s), [s])
   const [sort, setSort] = useState<string>(DEFAULT_PLAYER_SORT[s])
   const [asc, setAsc] = useState(false)
   const [search, setSearch] = useState('')
@@ -48,11 +48,7 @@ export default function Players() {
         />
       </div>
 
-      {s === 'soccer' ? (
-        <div className="bg-surface-card border border-surface-border rounded-xl p-8 text-center text-gray-500">
-          Player-level stats aren't available for soccer yet.
-        </div>
-      ) : loading ? (
+      {loading ? (
         <LoadingSpinner label="Loading player stats..." />
       ) : (
         <>

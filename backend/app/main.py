@@ -53,18 +53,9 @@ def _prewarm_nfl(service):
     service.get_player_season_stats()
 
 
-def _prewarm_soccer(service):
-    # football-data.org's free tier is 10 requests/minute — only prewarm the
-    # default league (epl) at startup; the other 5 populate lazily on first
-    # request instead, each caching for 6h once fetched.
-    service.get_team_season_stats(league="epl")
-    service.get_todays_games(league="epl")
-
-
 _PREWARM_ROUTINES = {
     "nba": _prewarm_nba,
     "nfl": _prewarm_nfl,
-    "soccer": _prewarm_soccer,
 }
 
 

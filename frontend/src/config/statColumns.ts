@@ -35,16 +35,6 @@ export const TEAM_COLUMNS: Record<Sport, ColumnConfig[]> = {
     { key: 'TO_PER_GAME', label: 'TO/G' },
     { key: 'PT_DIFF', label: 'DIFF', signColor: true },
   ],
-  soccer: [
-    { key: 'W', label: 'W' },
-    { key: 'D', label: 'D' },
-    { key: 'L', label: 'L' },
-    { key: 'W_PCT', label: 'WIN%', percent: true },
-    { key: 'PTS_TOTAL', label: 'PTS' },
-    { key: 'GF', label: 'GF' },
-    { key: 'GA', label: 'GA' },
-    { key: 'GD', label: 'GD', signColor: true },
-  ],
 }
 
 export const PLAYER_COLUMNS: Record<Sport, ColumnConfig[]> = {
@@ -73,13 +63,11 @@ export const PLAYER_COLUMNS: Record<Sport, ColumnConfig[]> = {
     { key: 'RECEIVING_TDS', label: 'REC TD' },
     { key: 'FANTASY_POINTS', label: 'FPTS' },
   ],
-  soccer: [],
 }
 
 export const DEFAULT_PLAYER_SORT: Record<Sport, string> = {
   nba: 'PTS',
   nfl: 'FANTASY_POINTS',
-  soccer: '',
 }
 
 export interface SummaryCardConfig {
@@ -101,11 +89,6 @@ export const MATCHUP_SUMMARY_CARDS: Record<Sport, SummaryCardConfig[]> = {
     { key: 'PTS', label: 'PPG' },
     { key: 'PTS_ALLOWED', label: 'PAPG' },
     { key: 'YDS_PER_GAME', label: 'YDS/G' },
-  ],
-  soccer: [
-    { key: 'GF_PER_GAME', label: 'GF/G' },
-    { key: 'GA_PER_GAME', label: 'GA/G' },
-    { key: 'PTS_PER_GAME', label: 'PTS/G' },
   ],
 }
 
@@ -132,13 +115,11 @@ export const PREDICTION_STAT_CATEGORIES: Record<Sport, PredictionStatCategory[]>
     { key: 'RECEIVING_YARDS', label: 'Receiving Yards' },
     { key: 'RECEPTIONS', label: 'Receptions' },
   ],
-  soccer: [],
 }
 
 export const YESTERDAY_STAT_ORDER: Record<Sport, string[]> = {
   nba: ['PTS', 'REB', 'AST', 'FG3M', 'BLK', 'STL'],
   nfl: ['PASSING_YARDS', 'PASSING_TDS', 'RUSHING_YARDS', 'RECEIVING_YARDS', 'RECEPTIONS'],
-  soccer: [],
 }
 
 export const YESTERDAY_STAT_LABEL: Record<Sport, Record<string, string>> = {
@@ -147,5 +128,4 @@ export const YESTERDAY_STAT_LABEL: Record<Sport, Record<string, string>> = {
     PASSING_YARDS: 'Passing Yards', PASSING_TDS: 'Passing TDs',
     RUSHING_YARDS: 'Rushing Yards', RECEIVING_YARDS: 'Receiving Yards', RECEPTIONS: 'Receptions',
   },
-  soccer: {},
 }
