@@ -7,9 +7,9 @@ import SortableStatTable from '../components/SortableStatTable'
 import LoadingSpinner from '../components/LoadingSpinner'
 
 export default function Teams() {
-  const { sport: s } = useCurrentSport()
+  const { sport: s, league } = useCurrentSport()
   const COLS = TEAM_COLUMNS[s]
-  const { data, loading } = useApi(() => teamsApi.getStats(s), [s])
+  const { data, loading } = useApi(() => teamsApi.getStats(s, league), [s, league])
   const [sort, setSort] = useState<string>('W_PCT')
   const [asc, setAsc] = useState(false)
   const [search, setSearch] = useState('')
@@ -46,8 +46,11 @@ export default function Teams() {
           <SortableStatTable
             rows={teams}
             columns={COLS}
-            rowKey={t => t.TEAM_ID}
-            leadingColumns={[{ label: 'Team', render: t => <span className="text-white font-medium">{t.TEAM_NAME}</span> }]}
+            rowKey={t => `${t.TEAM_ID}_${t.LEAGUE ?? ''}`}
+            leadingColumns={[
+              { label: 'Team', render: t => <span className="text-white font-medium">{t.TEAM_NAME}</span> },
+              ...(s === 'soccer' ? [{ label: 'League', render: (t: any) => <span className="text-gray-400 text-sm">{t.LEAGUE}</span> }] : []),
+            ]}
             sort={sort}
             asc={asc}
             onSort={handleSort}

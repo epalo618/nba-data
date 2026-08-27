@@ -69,6 +69,7 @@ async def get_todays_games(
                 "away_team_name": away_name,
                 "home_win_prob": win_probs["home_win_prob"],
                 "away_win_prob": win_probs["away_win_prob"],
+                "draw_prob": win_probs.get("draw_prob"),
                 "favored_team": win_probs.get("favored_team"),
                 "win_reasons": win_probs.get("reasons", []),
                 "win_prob_factors": win_probs["factors"],

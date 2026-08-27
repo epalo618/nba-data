@@ -55,10 +55,10 @@ function TeamColumn({ label, rows, statOrder, statLabel }: { label: string; rows
 }
 
 export default function Yesterday() {
-  const { sport: s } = useCurrentSport()
+  const { sport: s, league } = useCurrentSport()
   const statOrder = YESTERDAY_STAT_ORDER[s]
   const statLabel = YESTERDAY_STAT_LABEL[s]
-  const { data, loading, error } = useApi(() => predictionsApi.getYesterday(s), [s])
+  const { data, loading, error } = useApi(() => predictionsApi.getYesterday(s, league), [s, league])
   const rows = (data as any[]) ?? []
 
   const correct = rows.filter(r => r.correct).length

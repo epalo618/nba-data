@@ -7,8 +7,8 @@ import ConfidenceBadge from '../components/ConfidenceBadge'
 import clsx from 'clsx'
 
 export default function Predictions() {
-  const { sport: s } = useCurrentSport()
-  const { data, loading } = useApi(() => predictionsApi.getBestBets(s), [s])
+  const { sport: s, league } = useCurrentSport()
+  const { data, loading } = useApi(() => predictionsApi.getBestBets(s, league), [s, league])
   const bets = (data as any[]) ?? []
 
   const categories = PREDICTION_STAT_CATEGORIES[s].map(cat => ({

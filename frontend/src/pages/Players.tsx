@@ -7,9 +7,9 @@ import SortableStatTable from '../components/SortableStatTable'
 import LoadingSpinner from '../components/LoadingSpinner'
 
 export default function Players() {
-  const { sport: s } = useCurrentSport()
+  const { sport: s, league } = useCurrentSport()
   const COLS = PLAYER_COLUMNS[s]
-  const { data, loading } = useApi(() => playersApi.getStats(s), [s])
+  const { data, loading } = useApi(() => playersApi.getStats(s, undefined, league), [s, league])
   const [sort, setSort] = useState<string>(DEFAULT_PLAYER_SORT[s])
   const [asc, setAsc] = useState(false)
   const [search, setSearch] = useState('')

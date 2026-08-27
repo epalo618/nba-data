@@ -13,6 +13,7 @@ const SPORTS: { key: Sport; label: string }[] = [
 // Europa League and MLS aren't in football-data.org's free tier, so they're
 // left out here too until that changes.
 const SOCCER_LEAGUES = [
+  { key: 'all', label: 'All Leagues' },
   { key: 'epl', label: 'Premier League' },
   { key: 'laliga', label: 'La Liga' },
   { key: 'seriea', label: 'Serie A' },

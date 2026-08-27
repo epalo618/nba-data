@@ -13,16 +13,16 @@ import clsx from 'clsx'
 
 export default function GameMatchup() {
   const { homeId, awayId } = useParams<{ homeId: string; awayId: string }>()
-  const { sport: s } = useCurrentSport()
+  const { sport: s, league } = useCurrentSport()
   const hId = Number(homeId)
   const aId = Number(awayId)
 
-  const { data: matchup, loading: mLoading } = useApi(() => gamesApi.getMatchup(s, hId, aId), [s, hId, aId])
+  const { data: matchup, loading: mLoading } = useApi(() => gamesApi.getMatchup(s, hId, aId, league), [s, hId, aId, league])
   const { data: playerProjs, loading: pLoading } = useApi(
-    () => predictionsApi.getGamePlayerProjections(s, hId, aId, 8),
-    [s, hId, aId]
+    () => predictionsApi.getGamePlayerProjections(s, hId, aId, 8, league),
+    [s, hId, aId, league]
   )
-  const { data: allTeamStats } = useApi(() => teamsApi.getStats(s), [s])
+  const { data: allTeamStats } = useApi(() => teamsApi.getStats(s, league), [s, league])
 
   const m = matchup as any
   const pp = playerProjs as any

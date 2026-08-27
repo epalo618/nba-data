@@ -3,13 +3,14 @@ import { gamesApi } from '../services/api'
 import { useCurrentSport } from '../hooks/useCurrentSport'
 import { SPORT_LABEL } from '../types/domain'
 import WinProbBar from '../components/WinProbBar'
+import WinProbBar3Way from '../components/WinProbBar3Way'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { Link } from 'react-router-dom'
 import clsx from 'clsx'
 
 export default function Games() {
-  const { sport: s } = useCurrentSport()
-  const { data, loading } = useApi(() => gamesApi.getToday(s), [s])
+  const { sport: s, league } = useCurrentSport()
+  const { data, loading } = useApi(() => gamesApi.getToday(s, league), [s, league])
   const games = (data as any)?.games ?? []
 
   return (
@@ -33,6 +34,9 @@ export default function Games() {
                 </div>
                 <div className="text-center">
                   <div className="text-brand font-bold text-xl">VS</div>
+                  {game.LEAGUE && (
+                    <div className="text-xs text-gray-500 mt-1">{game.LEAGUE}</div>
+                  )}
                   {game.GAME_STATUS_TEXT && (
                     <div className="text-xs text-gray-500 mt-1">{game.GAME_STATUS_TEXT}</div>
                   )}
@@ -43,12 +47,22 @@ export default function Games() {
                 </div>
               </div>
 
-              <WinProbBar
-                homeTeam={game.home_team_name?.split(' ').pop() ?? ''}
-                awayTeam={game.away_team_name?.split(' ').pop() ?? ''}
-                homeProb={game.home_win_prob ?? 0.5}
-                awayProb={game.away_win_prob ?? 0.5}
-              />
+              {s === 'soccer' ? (
+                <WinProbBar3Way
+                  homeTeam={game.home_team_name?.split(' ').pop() ?? ''}
+                  awayTeam={game.away_team_name?.split(' ').pop() ?? ''}
+                  homeProb={game.home_win_prob ?? 0.33}
+                  drawProb={game.draw_prob ?? 0.34}
+                  awayProb={game.away_win_prob ?? 0.33}
+                />
+              ) : (
+                <WinProbBar
+                  homeTeam={game.home_team_name?.split(' ').pop() ?? ''}
+                  awayTeam={game.away_team_name?.split(' ').pop() ?? ''}
+                  homeProb={game.home_win_prob ?? 0.5}
+                  awayProb={game.away_win_prob ?? 0.5}
+                />
+              )}
 
               {game.favored_team && (
                 <div className="mt-4 mb-2">
@@ -68,7 +82,7 @@ export default function Games() {
 
               <div className="grid grid-cols-3 gap-4 mt-4 border-t border-surface-border pt-4 text-sm">
                 <div className="text-center">
-                  <div className="text-gray-500 text-xs">Proj Total</div>
+                  <div className="text-gray-500 text-xs">{s === 'soccer' ? 'Proj Goals' : 'Proj Total'}</div>
                   <div className="text-white font-bold">{game.projected_total ?? '—'}</div>
                 </div>
                 <div className="text-center">
