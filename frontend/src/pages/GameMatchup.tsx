@@ -21,12 +21,20 @@ export default function GameMatchup() {
     [s, hId, aId]
   )
   const { data: allTeamStats } = useApi(() => teamsApi.getStats(s), [s])
+  const { data: allTeams } = useApi(() => teamsApi.getAll(s), [s])
 
   const m = matchup as any
   const pp = playerProjs as any
 
   const teamMap = ((allTeamStats as any[]) ?? []).reduce((acc: any, t: any) => {
     acc[t.TEAM_ID] = t
+    return acc
+  }, {})
+
+  // Roster list is always populated (even before the season starts), unlike the
+  // stats endpoint — use it as the reliable source for team names.
+  const nameById = ((allTeams as any[]) ?? []).reduce((acc: any, t: any) => {
+    acc[t.id] = t.full_name
     return acc
   }, {})
 
@@ -48,15 +56,15 @@ export default function GameMatchup() {
   if (mLoading) return <LoadingSpinner label="Loading matchup..." />
 
   const winProb = m?.win_probability ?? {}
-  const homeName = homeTeam?.TEAM_NAME ?? `Team ${hId}`
-  const awayName = awayTeam?.TEAM_NAME ?? `Team ${aId}`
+  const homeName = m?.home_team_name ?? homeTeam?.TEAM_NAME ?? nameById[hId] ?? `Team ${hId}`
+  const awayName = m?.away_team_name ?? awayTeam?.TEAM_NAME ?? nameById[aId] ?? `Team ${aId}`
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
       <div className="bg-surface-card border border-surface-border rounded-xl p-6">
         <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-white">{homeName} <span className="text-gray-500">vs</span> {awayName}</h1>
-          <p className="text-gray-500 text-sm mt-1">Game Day Matchup Analysis</p>
+          <h1 className="text-2xl font-bold text-white">{awayName} <span className="text-gray-500">@</span> {homeName}</h1>
+          <p className="text-gray-500 text-sm mt-1">Away vs Home · Game Day Matchup Analysis</p>
         </div>
         <WinProbBar
           homeTeam={homeName}
@@ -66,8 +74,8 @@ export default function GameMatchup() {
         />
         <div className="grid grid-cols-2 gap-4 mt-6 md:grid-cols-4">
           <StatCard label="Projected Total" value={m?.projected_total ?? '—'} />
-          <StatCard label="Home Win Prob" value={`${Math.round((winProb.home_win_prob ?? 0.5) * 100)}%`} color="text-brand" />
           <StatCard label="Away Win Prob" value={`${Math.round((winProb.away_win_prob ?? 0.5) * 100)}%`} color="text-brand" />
+          <StatCard label="Home Win Prob" value={`${Math.round((winProb.home_win_prob ?? 0.5) * 100)}%`} color="text-brand" />
           <StatCard
             label="Projected Winner"
             value={winProb.favored_team ?? ((winProb.home_win_prob ?? 0.5) >= 0.5 ? homeName.split(' ').pop()! : awayName.split(' ').pop()!)}
@@ -93,7 +101,7 @@ export default function GameMatchup() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {[{ team: homeTeam, name: homeName, chart: homeChartData }, { team: awayTeam, name: awayName, chart: awayChartData }].map(({ team, name, chart }) => (
+        {[{ team: awayTeam, name: awayName, chart: awayChartData }, { team: homeTeam, name: homeName, chart: homeChartData }].map(({ team, name, chart }) => (
           <div key={name} className="bg-surface-card border border-surface-border rounded-xl p-5">
             <h2 className="text-white font-bold mb-3">{name} — Last 10 Games</h2>
             <MatchupStatCards sport={s} team={team} />
@@ -116,8 +124,8 @@ export default function GameMatchup() {
         {pLoading ? <LoadingSpinner label="Projecting player props..." /> : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {[
-              { label: homeName, players: pp?.home_players ?? [] },
               { label: awayName, players: pp?.away_players ?? [] },
+              { label: homeName, players: pp?.home_players ?? [] },
             ].map(({ label, players }) => (
               <div key={label} className="bg-surface-card border border-surface-border rounded-xl p-5">
                 <h3 className="text-white font-semibold mb-3">{label}</h3>
