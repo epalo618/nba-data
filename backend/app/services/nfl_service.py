@@ -8,11 +8,15 @@ from app.services.cache_utils import make_cache
 # Bumped to 2026 on 2026-09-08: the 2025 season is fully complete (Super Bowl
 # played 2026-02-08) and the 2026 schedule is published (Week 1 opens 2026-09-09).
 CURRENT_SEASON = 2026
+PRIOR_SEASON = CURRENT_SEASON - 1
 
 # Stats reflect ONLY the current season. Before Week 1 they're empty on purpose;
 # the prediction layer anchors early-season projections to the betting line
 # (which already prices in offseason trades/draft/injuries) and shifts toward
 # these numbers as real games are played. See predictions_common.data_confidence.
+# The one exception is get_prior_team_scoring() below, which game-total
+# projections use as a lightly-weighted, regressed prior — scoring environment
+# carries over between seasons far better than win/loss does.
 CACHE_TTL = 3600  # 1 hour
 _cached = make_cache(CACHE_TTL)
 
@@ -125,6 +129,30 @@ def get_team_season_stats(league: str | None = None):
             })
         return out
     return _cached(f"team_season_stats_{CURRENT_SEASON}", fetch)
+
+
+def get_prior_team_scoring(league: str | None = None) -> dict:
+    """{team_id: {"PTS": ppg, "PTS_ALLOWED": papg}} from the last completed season.
+    Used only as a regressed prior for game-total projections before the new
+    season has data — offense/defense scoring level is far more roster-stable
+    year to year than win/loss."""
+    def fetch():
+        m = _team_id_map()
+        by_team: dict = {}
+        for r in _team_game_results(PRIOR_SEASON):
+            by_team.setdefault(r["team"], []).append(r)
+        out: dict = {}
+        for abbr, games in by_team.items():
+            tid = m["abbr_to_id"].get(abbr)
+            if tid is None or not games:
+                continue
+            gp = len(games)
+            out[tid] = {
+                "PTS": round(sum(g["pts_for"] for g in games) / gp, 1),
+                "PTS_ALLOWED": round(sum(g["pts_against"] for g in games) / gp, 1),
+            }
+        return out
+    return _cached(f"prior_team_scoring_{PRIOR_SEASON}", fetch)
 
 
 def _team_stats_rows(season: int = CURRENT_SEASON) -> list[dict]:

@@ -14,6 +14,26 @@ NFL_STD = 13.5
 # which already reflects offseason trades, the draft, and injury news.
 DATA_RAMP_GAMES = 4
 
+# Game-total projection: at kickoff the market total gets COLD_MARKET_WEIGHT and
+# the rest is an independent scoring model; the market share fades to 0 as a
+# team's own current-season data accumulates. The model's own baseline is last
+# season's combined scoring, regressed PRIOR_REGRESSION of the way toward the
+# league-average total (scoring level carries over between seasons; specific
+# results do not).
+LEAGUE_AVG_TOTAL_NFL = 44.0
+PRIOR_REGRESSION = 0.40
+COLD_MARKET_WEIGHT = 0.75
+
+
+def _scoring_total(home: dict, away: dict) -> float | None:
+    """Expected combined points from two {PTS, PTS_ALLOWED} rows, or None if
+    either side is missing its numbers."""
+    hp, hpa = home.get("PTS"), home.get("PTS_ALLOWED")
+    ap, apa = away.get("PTS"), away.get("PTS_ALLOWED")
+    if None in (hp, hpa, ap, apa):
+        return None
+    return (hp + apa) / 2 + (ap + hpa) / 2
+
 
 def _team_gp(row: dict) -> int:
     return int(row.get("GP", 0) or 0)
@@ -152,43 +172,55 @@ def calculate_projected_total(
     market_total = market.get("total")
 
     season = {r["TEAM_ID"]: r for r in nfl_service.get_team_season_stats()}
-    home = season.get(home_team_id, {})
-    away = season.get(away_team_id, {})
+    home = season.get(home_team_id)
+    away = season.get(away_team_id)
     conf = min(
-        data_confidence(_team_gp(home), DATA_RAMP_GAMES),
-        data_confidence(_team_gp(away), DATA_RAMP_GAMES),
+        data_confidence(_team_gp(home or {}), DATA_RAMP_GAMES),
+        data_confidence(_team_gp(away or {}), DATA_RAMP_GAMES),
     )
 
-    # No 2026 scoring yet: use the market total, or nothing if there's no line.
-    if conf <= 0.0:
-        return round(market_total, 1) if market_total is not None else None
+    # Current-season scoring model (season stats blended with last-5 recent form).
+    cur_total = None
+    if home is not None and away is not None:
+        cur_total = _scoring_total(home, away)
+        try:
+            def _avg(games, field):
+                vals = [g[field] for g in games if g.get(field) is not None]
+                return sum(vals) / len(vals) if vals else None
 
-    home_ppg = home.get("PTS", 21)
-    home_papg = home.get("PTS_ALLOWED", 21)
-    away_ppg = away.get("PTS", 21)
-    away_papg = away.get("PTS_ALLOWED", 21)
-    season_proj = (home_ppg + away_papg) / 2 + (away_ppg + home_papg) / 2
-    model_total = season_proj
+            hg = nfl_service.get_team_last_n_games(home_team_id, 5)
+            ag = nfl_service.get_team_last_n_games(away_team_id, 5)
+            hs, ha = _avg(hg, "PTS"), _avg(hg, "PTS_ALLOWED")
+            as_, aa = _avg(ag, "PTS"), _avg(ag, "PTS_ALLOWED")
+            if cur_total is not None and None not in (hs, ha, as_, aa):
+                recent = (hs + aa) / 2 + (as_ + ha) / 2
+                cur_total = 0.6 * recent + 0.4 * cur_total
+        except Exception:
+            pass
 
-    try:
-        home_games = nfl_service.get_team_last_n_games(home_team_id, 5)
-        away_games = nfl_service.get_team_last_n_games(away_team_id, 5)
+    # Prior-season combined scoring, regressed toward the league-average total.
+    prior = nfl_service.get_prior_team_scoring()
+    prior_raw = _scoring_total(prior.get(home_team_id, {}), prior.get(away_team_id, {}))
+    prior_total = None
+    if prior_raw is not None:
+        prior_total = (1 - PRIOR_REGRESSION) * prior_raw + PRIOR_REGRESSION * LEAGUE_AVG_TOTAL_NFL
 
-        def _avg(games, field):
-            vals = [g[field] for g in games if g.get(field) is not None]
-            return sum(vals) / len(vals) if vals else None
+    # Model = ramp from the regressed prior toward current-season scoring.
+    if cur_total is not None and prior_total is not None:
+        model_total = conf * cur_total + (1 - conf) * prior_total
+    else:
+        model_total = cur_total if cur_total is not None else prior_total
 
-        h_scored, h_allowed = _avg(home_games, "PTS"), _avg(home_games, "PTS_ALLOWED")
-        a_scored, a_allowed = _avg(away_games, "PTS"), _avg(away_games, "PTS_ALLOWED")
-        if all(v is not None for v in [h_scored, h_allowed, a_scored, a_allowed]):
-            recent_proj = (h_scored + a_allowed) / 2 + (a_scored + h_allowed) / 2
-            model_total = 0.6 * recent_proj + 0.4 * season_proj
-    except Exception:
-        pass
-
+    # Blend with the market: it carries COLD_MARKET_WEIGHT at kickoff, fading to 0.
     if market_total is None:
-        return round(model_total, 1)
-    return round(conf * model_total + (1 - conf) * market_total, 1)
+        combined = model_total
+    elif model_total is None:
+        combined = market_total
+    else:
+        mw = COLD_MARKET_WEIGHT * (1 - conf)
+        combined = mw * market_total + (1 - mw) * model_total
+
+    return round(combined) if combined is not None else None
 
 
 def project_player_stats(player_id: str, opponent_team_id: int, stat_cols: list[str], is_home: bool = False, league: str | None = None) -> list[dict]:
