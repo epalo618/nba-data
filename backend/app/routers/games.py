@@ -10,6 +10,10 @@ router = APIRouter()
 
 EASTERN = ZoneInfo("America/New_York")
 
+# How far our projected total must diverge from the betting line before we call
+# OVER/UNDER. Within this band we have no real edge, so we show no pick.
+OU_EDGE_THRESHOLD = {"nfl": 2.5, "nba": 6.0}
+
 
 def _week_start(anchor: date) -> date:
     """Sunday on/before `anchor`. Python's weekday() is Mon=0..Sun=6."""
@@ -24,10 +28,11 @@ def _market_from_odds(game_odds: dict, home_name: str) -> dict:
     return {"home_spread": home_spread, "total": game_odds.get("total")}
 
 
-def _enrich_games(games, service, predictions, odds_map, all_teams):
+def _enrich_games(games, service, predictions, odds_map, all_teams, sport="nfl"):
     """Attach win probabilities, projected totals, odds and H2H to raw game rows."""
     calculate_win_probability = predictions.calculate_win_probability
     calculate_projected_total = predictions.calculate_projected_total
+    ou_threshold = OU_EDGE_THRESHOLD.get(sport, 3.0)
 
     enriched = []
     for game in games:
@@ -61,7 +66,10 @@ def _enrich_games(games, service, predictions, odds_map, all_teams):
         ou_rec = None
         if over_under_line and proj_total is not None:
             diff = proj_total - over_under_line
-            ou_rec = "OVER" if diff > 3 else ("UNDER" if diff < -3 else "LEAN")
+            if diff >= ou_threshold:
+                ou_rec = "OVER"
+            elif diff <= -ou_threshold:
+                ou_rec = "UNDER"
 
         enriched.append({
             **game,
@@ -97,7 +105,7 @@ async def get_todays_games(
         odds_map = odds_service.parse_odds(raw_odds)
         all_teams = {t["id"]: t for t in service.get_all_teams()}
 
-        enriched = _enrich_games(data["games"], service, predictions, odds_map, all_teams)
+        enriched = _enrich_games(data["games"], service, predictions, odds_map, all_teams, sport)
         return {"games": enriched, "line_score": data["line_score"]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -134,7 +142,7 @@ async def get_week_games(
             date_str = d.isoformat()
             try:
                 data = service.get_games_for_date(date_str)
-                games = _enrich_games(data["games"], service, predictions, odds_map, all_teams)
+                games = _enrich_games(data["games"], service, predictions, odds_map, all_teams, sport)
             except Exception:
                 games = []
             days.append({"date": date_str, "games": games})

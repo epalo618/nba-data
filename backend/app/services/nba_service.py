@@ -23,6 +23,15 @@ CACHE_TTL = 3600  # 1 hour
 _cached = make_cache(CACHE_TTL)
 
 
+def _prior_season(s: str) -> str:
+    """'2026-27' -> '2025-26'."""
+    start = int(s.split("-")[0]) - 1
+    return f"{start}-{str(start + 1)[-2:]}"
+
+
+PRIOR_SEASON = _prior_season(CURRENT_SEASON)
+
+
 def _safe(fn, default):
     """nba_api raises (or returns empty) for a season that hasn't started or a
     flaky endpoint — treat as 'no current-season data yet'."""
@@ -30,6 +39,21 @@ def _safe(fn, default):
         return fn()
     except Exception:
         return default
+
+
+def get_prior_team_advanced(league: str | None = None) -> dict:
+    """{TEAM_ID: advanced-stat row} from the last completed season. Used only as a
+    regressed prior for game-total projections before the new season has data —
+    pace and efficiency carry over year to year far better than win/loss."""
+    def fetch():
+        rows = _safe(lambda: leaguedashteamstats.LeagueDashTeamStats(
+            season=PRIOR_SEASON,
+            measure_type_detailed_defense="Advanced",
+            per_mode_detailed="PerGame",
+            timeout=30,
+        ).get_data_frames()[0].to_dict(orient="records"), [])
+        return {int(r["TEAM_ID"]): r for r in rows}
+    return _cached(f"prior_team_advanced_{PRIOR_SEASON}", fetch)
 
 
 def _get_all_game_scores() -> dict:

@@ -15,9 +15,32 @@ HOME_COURT = 2.5
 # numbers over the betting line (which already reflects trades/draft/injuries).
 DATA_RAMP_GAMES = 12
 
+# Game-total projection: the market total carries COLD_MARKET_WEIGHT at tip-off
+# and fades to 0 as current-season data accumulates. The model's own baseline is
+# last season's pace/efficiency total, regressed PRIOR_REGRESSION toward the
+# league-average total.
+LEAGUE_AVG_TOTAL_NBA = 228.0
+PRIOR_REGRESSION = 0.40
+COLD_MARKET_WEIGHT = 0.75
+
 
 def _team_gp(row: dict) -> int:
     return int(row.get("GP", 0) or 0)
+
+
+def _pace_total(home: dict, away: dict) -> float | None:
+    """Expected combined points from two Advanced-stat rows (OFF/DEF rating +
+    pace), or None if either side is missing."""
+    if not home or not away:
+        return None
+    h_ortg = home.get("OFF_RATING"); h_drtg = home.get("DEF_RATING")
+    a_ortg = away.get("OFF_RATING"); a_drtg = away.get("DEF_RATING")
+    if None in (h_ortg, h_drtg, a_ortg, a_drtg):
+        return None
+    avg_pace = (home.get("PACE", 100) + away.get("PACE", 100)) / 2
+    hs = ((h_ortg + a_drtg) / 2) * (avg_pace / 100)
+    as_ = ((a_ortg + h_drtg) / 2) * (avg_pace / 100)
+    return hs + as_
 
 
 def calculate_win_probability(
@@ -143,47 +166,52 @@ def calculate_projected_total(
     market_total = market.get("total")
 
     adv = {r["TEAM_ID"]: r for r in nba_service.get_team_advanced_stats()}
-    home = adv.get(home_team_id, {})
-    away = adv.get(away_team_id, {})
+    home = adv.get(home_team_id)
+    away = adv.get(away_team_id)
     conf = min(
-        data_confidence(_team_gp(home), DATA_RAMP_GAMES),
-        data_confidence(_team_gp(away), DATA_RAMP_GAMES),
+        data_confidence(_team_gp(home or {}), DATA_RAMP_GAMES),
+        data_confidence(_team_gp(away or {}), DATA_RAMP_GAMES),
     )
 
-    if conf <= 0.0:
-        return round(market_total, 1) if market_total is not None else None
+    # Current-season pace/efficiency total, blended with last-8 recent scoring.
+    cur_total = _pace_total(home or {}, away or {})
+    if cur_total is not None:
+        try:
+            def _avg(games, field):
+                vals = [float(g[field]) for g in games if g.get(field) is not None]
+                return sum(vals) / len(vals) if vals else None
 
-    home_ortg = home.get("OFF_RATING", 110)
-    home_drtg = home.get("DEF_RATING", 110)
-    away_ortg = away.get("OFF_RATING", 110)
-    away_drtg = away.get("DEF_RATING", 110)
-    avg_pace = (home.get("PACE", 100) + away.get("PACE", 100)) / 2
+            hg = nba_service.get_team_last_n_games(home_team_id, 8)
+            ag = nba_service.get_team_last_n_games(away_team_id, 8)
+            hs, ha = _avg(hg, "PTS"), _avg(hg, "PTS_ALLOWED")
+            as_, aa = _avg(ag, "PTS"), _avg(ag, "PTS_ALLOWED")
+            if None not in (hs, ha, as_, aa):
+                recent = (hs + aa) / 2 + (as_ + ha) / 2
+                cur_total = 0.6 * recent + 0.4 * cur_total
+        except Exception:
+            pass
 
-    season_home = ((home_ortg + away_drtg) / 2) * (avg_pace / 100)
-    season_away = ((away_ortg + home_drtg) / 2) * (avg_pace / 100)
-    model_total = season_home + season_away
+    # Prior-season pace/efficiency total, regressed toward the league average.
+    prior_adv = nba_service.get_prior_team_advanced()
+    prior_raw = _pace_total(prior_adv.get(home_team_id, {}), prior_adv.get(away_team_id, {}))
+    prior_total = None
+    if prior_raw is not None:
+        prior_total = (1 - PRIOR_REGRESSION) * prior_raw + PRIOR_REGRESSION * LEAGUE_AVG_TOTAL_NBA
 
-    try:
-        home_games = nba_service.get_team_last_n_games(home_team_id, 8)
-        away_games = nba_service.get_team_last_n_games(away_team_id, 8)
-
-        def _avg(games, field):
-            vals = [float(g[field]) for g in games if g.get(field) is not None]
-            return sum(vals) / len(vals) if vals else None
-
-        h_scored = _avg(home_games, "PTS")
-        h_allowed = _avg(home_games, "PTS_ALLOWED")
-        a_scored = _avg(away_games, "PTS")
-        a_allowed = _avg(away_games, "PTS_ALLOWED")
-        if all(v is not None for v in [h_scored, h_allowed, a_scored, a_allowed]):
-            recent_proj = (h_scored + a_allowed) / 2 + (a_scored + h_allowed) / 2
-            model_total = 0.6 * recent_proj + 0.4 * model_total
-    except Exception:
-        pass
+    if cur_total is not None and prior_total is not None:
+        model_total = conf * cur_total + (1 - conf) * prior_total
+    else:
+        model_total = cur_total if cur_total is not None else prior_total
 
     if market_total is None:
-        return int(round(model_total))
-    return round(conf * model_total + (1 - conf) * market_total, 1)
+        combined = model_total
+    elif model_total is None:
+        combined = market_total
+    else:
+        mw = COLD_MARKET_WEIGHT * (1 - conf)
+        combined = mw * market_total + (1 - mw) * model_total
+
+    return int(round(combined)) if combined is not None else None
 
 
 def _days_rest(recent_games: list) -> int:
