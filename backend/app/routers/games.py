@@ -180,6 +180,8 @@ async def get_matchup(
         return {
             "home_team_id": home_team_id,
             "away_team_id": away_team_id,
+            "home_team_name": home_name,
+            "away_team_name": away_name,
             "win_probability": win_probs,
             "projected_total": proj_total,
             "home_last10": {"pts": home_pts, "pts_allowed": home_allowed, "games": home_log},
