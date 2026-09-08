@@ -4,8 +4,12 @@ from typing import Optional
 from app.services import nba_service
 from app.services.predictions_common import (
     _norm_cdf, _confidence_label, _decay_avg, get_prop_recommendation,
-    data_confidence, win_prob_from_spread,
+    data_confidence, win_prob_from_spread, anchor_prop_to_line, prop_recommendation,
 )
+
+# Current-season games before a player's own numbers fully outweigh the prop line.
+PLAYER_DATA_RAMP_GAMES = 10
+PRIOR_PLAYER_HAIRCUT = 0.90
 
 # NBA game-to-game scoring std dev ≈ 11 pts (empirically established).
 NBA_STD = 11.0
@@ -229,16 +233,20 @@ def _days_rest(recent_games: list) -> int:
         return 3
 
 
-def project_player_stats(player_id: int | str, opponent_team_id: int, stat_cols: list[str], is_home: bool = False, league: str | None = None) -> list[dict]:
+def project_player_stats(player_id: int | str, opponent_team_id: int, stat_cols: list[str],
+                         is_home: bool = False, league: str | None = None,
+                         prop_lines: dict | None = None) -> list[dict]:
     # player_id arrives as str from the route (NFL's GSIS ids aren't numeric), but
     # nba_api's PLAYER_ID is an int — cast up front so every lookup below matches.
     player_id = int(player_id)
-    all_players = nba_service.get_player_season_stats()
-    player_map = {p["PLAYER_ID"]: p for p in all_players}
-    player = player_map.get(player_id)
-    if not player:
+    prop_lines = prop_lines or {}
+    player = {p["PLAYER_ID"]: p for p in nba_service.get_player_season_stats()}.get(player_id)
+    prior = nba_service.get_prior_player_season_stats().get(player_id)
+    src = player or prior
+    if not src:
         return []
 
+    player_gp = int((player or {}).get("GP", 0) or 0)
     recent_games = nba_service.get_player_last_n_games(player_id, 10)
     last5 = recent_games[:5]
     last10 = recent_games[:10]
@@ -250,7 +258,7 @@ def project_player_stats(player_id: int | str, opponent_team_id: int, stat_cols:
         opp_ranks = {}
 
     # Playoff sample size — scale playoff weight by games played (full weight at 10+)
-    playoff_gp = int(player.get("PLAYOFF_GP", 0))
+    playoff_gp = int((player or {}).get("PLAYOFF_GP", 0))
     playoff_scale = min(playoff_gp / 10, 1.0)
 
     results = []
@@ -258,48 +266,61 @@ def project_player_stats(player_id: int | str, opponent_team_id: int, stat_cols:
 
     for stat in stat_cols:
         col = stat_map.get(stat, stat)
-        season_avg = float((player.get(col, 0) or 0))
 
-        raw_reg = player.get(f"{col}_REG")
-        raw_playoff = player.get(f"{col}_PLAYOFF")
-        reg_avg = float(round(raw_reg or 0, 1)) if raw_reg is not None else round(season_avg, 1)
-        playoff_avg = float(round(raw_playoff or 0, 1)) if raw_playoff is not None else None
+        if player is not None:
+            season_avg = float((player.get(col, 0) or 0))
+            raw_reg = player.get(f"{col}_REG")
+            raw_playoff = player.get(f"{col}_PLAYOFF")
+            reg_avg = float(round(raw_reg or 0, 1)) if raw_reg is not None else round(season_avg, 1)
+            playoff_avg = float(round(raw_playoff or 0, 1)) if raw_playoff is not None else None
+            l5 = _decay_avg(last5, col) or season_avg
+            l10 = _decay_avg(last10, col) or season_avg
 
-        l5 = _decay_avg(last5, col) or season_avg
-        l10 = _decay_avg(last10, col) or season_avg
+            if playoff_avg is not None:
+                # Redistribute unused playoff weight to L10 (60%) and season avg (40%)
+                p_weight = 0.20 * playoff_scale
+                extra = 0.20 * (1 - playoff_scale)
+                base = (
+                    (0.38 + extra * 0.60) * l10
+                    + (0.17 + extra * 0.40) * season_avg
+                    + p_weight * playoff_avg
+                    + 0.20 * l5
+                    + 0.05 * reg_avg
+                )
+            else:
+                base = 0.30 * season_avg + 0.45 * l10 + 0.25 * l5
+        else:
+            # Pre-season: last season's per-game average, regressed to the mean.
+            season_avg = round(float(prior.get(col, 0) or 0) * PRIOR_PLAYER_HAIRCUT, 1)
+            reg_avg = season_avg
+            playoff_avg = None
+            l5 = l10 = season_avg
+            base = season_avg
 
         # Opponent factor capped at ±8% (rank 1 = worst defense = easiest matchup)
         opp_rank = int(opp_ranks.get(stat, 15))
         opp_factor = max(-0.08, min(0.08, (16 - opp_rank) / 100))
+        model_proj = base * (1 + opp_factor)
 
-        if playoff_avg is not None:
-            # Redistribute unused playoff weight to L10 (60%) and season avg (40%)
-            p_weight = 0.20 * playoff_scale
-            extra = 0.20 * (1 - playoff_scale)
-            base = (
-                (0.38 + extra * 0.60) * l10
-                + (0.17 + extra * 0.40) * season_avg
-                + p_weight * playoff_avg
-                + 0.20 * l5
-                + 0.05 * reg_avg
-            )
-        else:
-            base = 0.30 * season_avg + 0.45 * l10 + 0.25 * l5
-
-        projection = int(round(base * (1 + opp_factor)))
+        line = prop_lines.get(stat)
+        final, basis = anchor_prop_to_line(model_proj, line, player_gp, PLAYER_DATA_RAMP_GAMES)
+        rec = prop_recommendation(final, line)
 
         results.append({
             "player_id": int(player_id),
-            "player_name": str(player.get("PLAYER_NAME", "")),
-            "team_abbreviation": str(player.get("TEAM_ABBREVIATION", "")),
+            "player_name": str(src.get("PLAYER_NAME", "")),
+            "team_abbreviation": str(src.get("TEAM_ABBREVIATION", "")),
             "stat": stat,
-            "season_avg": float(round(season_avg, 1)),
-            "reg_season_avg": float(reg_avg),
-            "playoff_avg": float(playoff_avg) if playoff_avg is not None else None,
-            "last5_avg": float(l5),
-            "last10_avg": float(l10),
+            "season_avg": int(round(season_avg)),
+            "reg_season_avg": int(round(reg_avg)),
+            "playoff_avg": int(round(playoff_avg)) if playoff_avg is not None else None,
+            "last5_avg": int(round(l5)),
+            "last10_avg": int(round(l10)),
             "opponent_rank": opp_rank,
-            "projection": projection,
+            "projection": int(round(final)),
+            "line": line,
+            "recommendation": rec,
+            "basis": basis,
         })
 
     return results

@@ -235,6 +235,40 @@ def get_player_season_stats(league: str | None = None):
     return _cached(f"player_season_stats_{CURRENT_SEASON}", fetch)
 
 
+def get_prior_player_season_stats(league: str | None = None) -> dict:
+    """{PLAYER_ID: per-game-average row} from the last completed season. Feeds
+    the prop model only, as a regressed cold-start estimate before the new
+    season has data — not a return to general prior-season seeding."""
+    def fetch():
+        m = _team_id_map()
+        ps = _safe_load(nfl.load_player_stats, seasons=[PRIOR_SEASON])
+        reg = [r for r in ps if r.get("season_type") == "REG"]
+        by_player: dict = {}
+        for r in reg:
+            by_player.setdefault(r["player_id"], []).append(r)
+        out: dict = {}
+        for pid, rows in by_player.items():
+            gp = len(rows)
+            if gp == 0:
+                continue
+            last = rows[-1]
+            row = {
+                "PLAYER_ID": pid,
+                "PLAYER_NAME": last.get("player_display_name"),
+                "TEAM_ABBREVIATION": last.get("team"),
+                "TEAM_ID": m["abbr_to_id"].get(last.get("team")),
+                "POSITION": last.get("position"),
+                "GP": gp,
+            }
+            for col in _PLAYER_STAT_COLS:
+                vals = [r.get(col) or 0 for r in rows]
+                row[col.upper()] = round(sum(vals) / gp, 1)
+            row["MIN"] = round(row["FANTASY_POINTS"] * gp, 1)
+            out[pid] = row
+        return out
+    return _cached(f"prior_player_season_stats_{PRIOR_SEASON}", fetch)
+
+
 def get_opponent_stat_ranks(league: str | None = None) -> dict:
     """Single overall defensive rank (by total yards allowed/game) applied to every
     stat category — a v1 simplification vs. NBA's true per-stat opponent ranking.

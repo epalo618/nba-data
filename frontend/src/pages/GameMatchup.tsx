@@ -139,7 +139,7 @@ export default function GameMatchup() {
                       <span>L10</span>
                       <span>L5</span>
                       <span className="font-semibold text-gray-400">PROJ</span>
-                      <span>TOT AVG</span>
+                      <span>LINE</span>
                       <span>SIGNAL</span>
                     </div>
                     {(p.projections ?? []).map((proj: any) => (

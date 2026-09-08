@@ -26,6 +26,39 @@ def blend(model_value, anchor_value, weight: float):
     return weight * model_value + (1 - weight) * anchor_value
 
 
+PROP_COLD_MARKET_WEIGHT = 0.75
+PROP_EDGE_THRESHOLD = 0.08  # min |proj - line| / line to call OVER/UNDER
+
+
+def anchor_prop_to_line(model_projection: float, line, games_played: int, ramp_games: int):
+    """Blend a model prop projection with the sportsbook line the same way game
+    totals are handled: the line carries PROP_COLD_MARKET_WEIGHT at season start
+    and fades to 0 as the player accumulates current-season games.
+
+    Returns (final_projection, basis) where basis is 'market' | 'blend' | 'model'.
+    """
+    if line is None:
+        return model_projection, "model"
+    conf = data_confidence(games_played, ramp_games)
+    mw = PROP_COLD_MARKET_WEIGHT * (1 - conf)
+    final = mw * line + (1 - mw) * model_projection
+    basis = "market" if conf <= 0 else ("model" if conf >= 1 else "blend")
+    return final, basis
+
+
+def prop_recommendation(final_projection: float, line) -> str | None:
+    """OVER / UNDER only when the projection clears PROP_EDGE_THRESHOLD; otherwise
+    None (no edge, no pick)."""
+    if line is None:
+        return None
+    edge = (final_projection - line) / max(abs(line), 0.1)
+    if edge >= PROP_EDGE_THRESHOLD:
+        return "OVER"
+    if edge <= -PROP_EDGE_THRESHOLD:
+        return "UNDER"
+    return None
+
+
 def win_prob_from_spread(home_spread: float, std: float) -> float:
     """Convert a betting point spread into a home win probability. `home_spread`
     is the number next to the home team (negative = home favored), so a -3 line
