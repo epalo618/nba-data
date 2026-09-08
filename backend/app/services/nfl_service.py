@@ -5,10 +5,25 @@ from app.services.cache_utils import make_cache
 
 # NFL uses a single-year season string, unlike NBA's "2025-26". Needs a manual
 # bump each September once nflverse has that season's data flowing.
-CURRENT_SEASON = 2025
+# Bumped to 2026 on 2026-09-08: the 2025 season is fully complete (Super Bowl
+# played 2026-02-08) and the 2026 schedule is published (Week 1 opens 2026-09-09).
+CURRENT_SEASON = 2026
 
+# Stats reflect ONLY the current season. Before Week 1 they're empty on purpose;
+# the prediction layer anchors early-season projections to the betting line
+# (which already prices in offseason trades/draft/injuries) and shifts toward
+# these numbers as real games are played. See predictions_common.data_confidence.
 CACHE_TTL = 3600  # 1 hour
 _cached = make_cache(CACHE_TTL)
+
+
+def _safe_load(loader, **kwargs) -> list[dict]:
+    """nflverse publishes a season's stats/player parquet files only once games
+    have been played — before Week 1 they 404. Treat that as 'no data yet'."""
+    try:
+        return loader(**kwargs).to_dicts()
+    except Exception:
+        return []
 
 
 # nflreadpy's load_teams() includes relocated/retired franchise rows (e.g. STL/LA
@@ -85,10 +100,11 @@ def get_all_active_players(league: str | None = None):
 
 
 def get_team_season_stats(league: str | None = None):
+    """Current-season per-game team stats. Empty until Week 1 is played."""
     def fetch():
         m = _team_id_map()
         by_team: dict = {}
-        for r in _team_game_results():
+        for r in _team_game_results(CURRENT_SEASON):
             by_team.setdefault(r["team"], []).append(r)
         out = []
         for abbr, games in by_team.items():
@@ -115,20 +131,21 @@ def _team_stats_rows(season: int = CURRENT_SEASON) -> list[dict]:
     """Raw per-team-per-game stat rows from nflreadpy, cached once and shared by
     every caller that needs them (get_team_advanced_stats, get_opponent_stat_ranks)
     instead of each re-fetching/re-parsing the whole season table independently."""
-    return _cached(f"raw_team_stats_{season}", lambda: nfl.load_team_stats(seasons=[season]).to_dicts())
+    return _cached(f"raw_team_stats_{season}", lambda: _safe_load(nfl.load_team_stats, seasons=[season]))
 
 
 def get_team_advanced_stats(league: str | None = None):
     """NFL-appropriate 'advanced' stats: yards/game, turnovers/game, point differential.
     Deliberately uses different keys than NBA's OFF_RATING/DEF_RATING/NET_RATING/PACE —
-    the frontend's NFL column config (Phase 5) reads these key names directly."""
+    the frontend's NFL column config (Phase 5) reads these key names directly.
+    Current-season only; empty until Week 1 is played."""
     def fetch():
         m = _team_id_map()
         ts_by_team: dict = {}
-        for row in _team_stats_rows():
+        for row in _team_stats_rows(CURRENT_SEASON):
             ts_by_team.setdefault(row["team"], []).append(row)
         results_by_team: dict = {}
-        for r in _team_game_results():
+        for r in _team_game_results(CURRENT_SEASON):
             results_by_team.setdefault(r["team"], []).append(r)
 
         out = []
@@ -158,9 +175,10 @@ def get_team_advanced_stats(league: str | None = None):
 
 
 def get_player_season_stats(league: str | None = None):
+    """Current-season player per-game averages. Empty until Week 1 is played."""
     def fetch():
         m = _team_id_map()
-        ps = nfl.load_player_stats(seasons=[CURRENT_SEASON]).to_dicts()
+        ps = _safe_load(nfl.load_player_stats, seasons=[CURRENT_SEASON])
         reg = [r for r in ps if r.get("season_type") == "REG"]
         by_player: dict = {}
         for r in reg:
@@ -183,10 +201,6 @@ def get_player_season_stats(league: str | None = None):
             for col in _PLAYER_STAT_COLS:
                 vals = [r.get(col) or 0 for r in rows]
                 row[col.upper()] = round(sum(vals) / gp, 1)
-            # No "minutes played" concept in NFL box scores, but callers that pick
-            # "top players" (e.g. the game-matchup endpoint) sort by a MIN field
-            # generically — reuse that key with total fantasy points as a stand-in
-            # for on-field relevance, so QB/RB/WR/TE surface ahead of kickers etc.
             row["MIN"] = round(row["FANTASY_POINTS"] * gp, 1)
             out.append(row)
         return out
@@ -195,15 +209,17 @@ def get_player_season_stats(league: str | None = None):
 
 def get_opponent_stat_ranks(league: str | None = None) -> dict:
     """Single overall defensive rank (by total yards allowed/game) applied to every
-    stat category — a v1 simplification vs. NBA's true per-stat opponent ranking."""
+    stat category — a v1 simplification vs. NBA's true per-stat opponent ranking.
+    Current-season only; empty until Week 1 is played."""
     def fetch():
         m = _team_id_map()
         by_opp: dict = {}
-        for row in _team_stats_rows():
+        for row in _team_stats_rows(CURRENT_SEASON):
             opp = row.get("opponent_team")
             yds = (row.get("passing_yards") or 0) + (row.get("rushing_yards") or 0)
             by_opp.setdefault(opp, []).append(yds)
         avg_allowed = {opp: sum(v) / len(v) for opp, v in by_opp.items() if v}
+
         # rank 1 = allows the most yards = worst defense = easiest matchup (mirrors NBA's convention)
         sorted_teams = sorted(avg_allowed.items(), key=lambda x: -x[1])
 
@@ -249,12 +265,13 @@ def get_todays_games(league: str | None = None):
 
 
 def get_team_last_n_games(team_id: int, n: int = 10, league: str | None = None):
+    """Most recent current-season games (recent form). Empty until Week 1."""
     def fetch():
         m = _team_id_map()
         abbr = m["id_to_abbr"].get(team_id)
         if not abbr:
             return []
-        results = [r for r in _team_game_results() if r["team"] == abbr]
+        results = [r for r in _team_game_results(CURRENT_SEASON) if r["team"] == abbr]
         results.sort(key=lambda r: r["week"], reverse=True)
         return [{"PTS": g["pts_for"], "PTS_ALLOWED": g["pts_against"], "GAME_ID": g["game_id"], "WEEK": g["week"]} for g in results[:n]]
     return _cached(f"team_gamelog_{team_id}_{CURRENT_SEASON}", fetch)
@@ -266,7 +283,7 @@ def get_head_to_head(team_id: int, opp_team_id: int, league: str | None = None) 
         abbr, opp_abbr = m["id_to_abbr"].get(team_id), m["id_to_abbr"].get(opp_team_id)
         if not abbr or not opp_abbr:
             return {"team_wins": 0, "opp_wins": 0, "games_played": 0}
-        results = [r for r in _team_game_results() if r["team"] == abbr and r["opp"] == opp_abbr]
+        results = [r for r in _team_game_results(CURRENT_SEASON) if r["team"] == abbr and r["opp"] == opp_abbr]
         wins = sum(1 for r in results if r["win"])
         losses = sum(1 for r in results if not r["win"] and not r["tie"])
         return {"team_wins": wins, "opp_wins": losses, "games_played": len(results)}
@@ -274,9 +291,10 @@ def get_head_to_head(team_id: int, opp_team_id: int, league: str | None = None) 
 
 
 def get_player_last_n_games(player_id: str, n: int = 10, league: str | None = None):
+    """Most recent current-season games. Empty until Week 1."""
     def fetch():
-        ps = nfl.load_player_stats(seasons=[CURRENT_SEASON]).to_dicts()
-        rows = [r for r in ps if r.get("player_id") == player_id and r.get("season_type") == "REG"]
+        rows = [r for r in _safe_load(nfl.load_player_stats, seasons=[CURRENT_SEASON])
+                if r.get("player_id") == player_id and r.get("season_type") == "REG"]
         rows.sort(key=lambda r: r["week"], reverse=True)
         out = []
         for r in rows[:n]:
@@ -290,7 +308,7 @@ def get_player_last_n_games(player_id: str, n: int = 10, league: str | None = No
 
 def get_game_boxscore(game_id: str, league: str | None = None) -> list[dict]:
     def fetch():
-        ps = nfl.load_player_stats(seasons=[CURRENT_SEASON]).to_dicts()
+        ps = _safe_load(nfl.load_player_stats, seasons=[CURRENT_SEASON])
         return [r for r in ps if r.get("game_id") == game_id]
     return _cached(f"boxscore_{game_id}", fetch)
 
@@ -321,7 +339,7 @@ def get_player_stats_for_date(date_str: str, league: str | None = None) -> list[
         game_ids = {g["game_id"] for g in nfl.load_schedules(seasons=[CURRENT_SEASON]).to_dicts() if g.get("gameday") == date_str}
         if not game_ids:
             return []
-        ps = nfl.load_player_stats(seasons=[CURRENT_SEASON]).to_dicts()
+        ps = _safe_load(nfl.load_player_stats, seasons=[CURRENT_SEASON])
         out = []
         for r in ps:
             if r.get("game_id") not in game_ids:
