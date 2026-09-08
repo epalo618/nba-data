@@ -22,6 +22,8 @@ export const playersApi = {
 
 export const gamesApi = {
   getToday: (sport: Sport) => api.get(`/${sport}/games/today`),
+  getWeek: (sport: Sport, params: { start?: string; offset?: number } = {}) =>
+    api.get(`/${sport}/games/week`, { params }),
   getMatchup: (sport: Sport, homeId: number, awayId: number) =>
     api.get(`/${sport}/games/${homeId}/vs/${awayId}`),
 }

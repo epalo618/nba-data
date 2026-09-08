@@ -13,9 +13,23 @@ from nba_api.stats.endpoints import (
 )
 from app.services.cache_utils import make_cache
 
-CURRENT_SEASON = "2025-26"
+# Bumped to 2026-27 on 2026-09-08: the 2025-26 season finished in spring 2026.
+# Stats reflect ONLY this season and are empty until it tips off (~Oct 2026);
+# the prediction layer anchors early-season projections to the betting line
+# (which prices in offseason trades/draft/injuries) and shifts toward these
+# numbers as real games are played. See predictions_common.data_confidence.
+CURRENT_SEASON = "2026-27"
 CACHE_TTL = 3600  # 1 hour
 _cached = make_cache(CACHE_TTL)
+
+
+def _safe(fn, default):
+    """nba_api raises (or returns empty) for a season that hasn't started or a
+    flaky endpoint — treat as 'no current-season data yet'."""
+    try:
+        return fn()
+    except Exception:
+        return default
 
 
 def _get_all_game_scores() -> dict:
@@ -56,47 +70,41 @@ def get_all_active_players(league: str | None = None):
 
 
 def get_team_season_stats(league: str | None = None):
+    """Current-season per-game team stats. Empty until the season tips off."""
     def fetch():
-        resp = leaguedashteamstats.LeagueDashTeamStats(
-            season=CURRENT_SEASON,
-            per_mode_detailed="PerGame",
-            timeout=30,
-        )
-        df = resp.get_data_frames()[0]
-        return df.to_dict(orient="records")
+        return _safe(lambda: leaguedashteamstats.LeagueDashTeamStats(
+            season=CURRENT_SEASON, per_mode_detailed="PerGame", timeout=30,
+        ).get_data_frames()[0].to_dict(orient="records"), [])
     return _cached("team_season_stats", fetch)
 
 
 def get_team_advanced_stats(league: str | None = None):
+    """Current-season advanced ratings (OFF/DEF/NET/PACE) — feeds win probability
+    and projected totals. Empty until the season tips off."""
     def fetch():
-        resp = leaguedashteamstats.LeagueDashTeamStats(
+        return _safe(lambda: leaguedashteamstats.LeagueDashTeamStats(
             season=CURRENT_SEASON,
             measure_type_detailed_defense="Advanced",
             per_mode_detailed="PerGame",
             timeout=30,
-        )
-        df = resp.get_data_frames()[0]
-        return df.to_dict(orient="records")
+        ).get_data_frames()[0].to_dict(orient="records"), [])
     return _cached("team_advanced_stats", fetch)
 
 
 def get_player_season_stats(league: str | None = None):
+    """Current-season player per-game stats, regular season blended 50/50 with
+    playoffs once playoff data exists. Empty until the season tips off."""
     def fetch():
-        reg_resp = leaguedashplayerstats.LeagueDashPlayerStats(
-            season=CURRENT_SEASON,
-            per_mode_detailed="PerGame",
-            timeout=60,
-        )
-        reg_records = reg_resp.get_data_frames()[0].to_dict(orient="records")
+        reg_records = _safe(lambda: leaguedashplayerstats.LeagueDashPlayerStats(
+            season=CURRENT_SEASON, per_mode_detailed="PerGame", timeout=60,
+        ).get_data_frames()[0].to_dict(orient="records"), [])
+        if not reg_records:
+            return []
 
         time.sleep(0.5)
-        playoff_resp = leaguedashplayerstats.LeagueDashPlayerStats(
-            season=CURRENT_SEASON,
-            season_type_all_star="Playoffs",
-            per_mode_detailed="PerGame",
-            timeout=60,
-        )
-        playoff_records = playoff_resp.get_data_frames()[0].to_dict(orient="records")
+        playoff_records = _safe(lambda: leaguedashplayerstats.LeagueDashPlayerStats(
+            season=CURRENT_SEASON, season_type_all_star="Playoffs", per_mode_detailed="PerGame", timeout=60,
+        ).get_data_frames()[0].to_dict(orient="records"), [])
 
         if not playoff_records:
             return reg_records
@@ -128,37 +136,28 @@ def get_player_season_stats(league: str | None = None):
 
 
 def get_opponent_stat_ranks(league: str | None = None) -> dict:
-    """Per-stat defensive ranks per team. rank 1 = worst defense (allows most) for that stat."""
+    """Per-stat defensive ranks per team. rank 1 = worst defense (allows most).
+    Current-season only; empty until the season tips off."""
     def fetch():
-        resp = leaguedashteamstats.LeagueDashTeamStats(
+        records = _safe(lambda: leaguedashteamstats.LeagueDashTeamStats(
             season=CURRENT_SEASON,
             measure_type_detailed_defense="Opponent",
             per_mode_detailed="PerGame",
             timeout=30,
-        )
-        records = resp.get_data_frames()[0].to_dict(orient="records")
+        ).get_data_frames()[0].to_dict(orient="records"), [])
 
         stat_to_col = {
-            "PTS": "OPP_PTS",
-            "REB": "OPP_REB",
-            "AST": "OPP_AST",
-            "STL": "OPP_STL",
-            "BLK": "OPP_BLK",
-            "FG3M": "OPP_FG3M",
+            "PTS": "OPP_PTS", "REB": "OPP_REB", "AST": "OPP_AST",
+            "STL": "OPP_STL", "BLK": "OPP_BLK", "FG3M": "OPP_FG3M",
         }
 
         ranks: dict = {}
         for stat, col in stat_to_col.items():
             if not records or col not in records[0]:
                 continue
-            # Descending: rank 1 = allows most of this stat = worst defense = easiest matchup
             sorted_teams = sorted(records, key=lambda x: x.get(col, 0) or 0, reverse=True)
             for i, team in enumerate(sorted_teams):
-                tid = int(team["TEAM_ID"])
-                if tid not in ranks:
-                    ranks[tid] = {}
-                ranks[tid][stat] = i + 1
-
+                ranks.setdefault(int(team["TEAM_ID"]), {})[stat] = i + 1
         return ranks
     return _cached("opponent_stat_ranks", fetch)
 
@@ -226,16 +225,13 @@ def get_todays_games(league: str | None = None):
     def fetch():
         # Use Eastern time so the date doesn't flip at 8 PM EST (midnight UTC)
         today = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
-        return _parse_scoreboard(today)
+        try:
+            return _parse_scoreboard(today)
+        except Exception:
+            return {"games": [], "line_score": []}
 
     # 60-second TTL so live scores refresh; all other caches stay at 1 hour
-    key = "todays_games"
-    now = time.time()
-    if key in _cache and now - _cache[key]["ts"] < 60:
-        return _cache[key]["data"]
-    data = fetch()
-    _cache[key] = {"data": data, "ts": now}
-    return data
+    return _cached("todays_games", fetch, ttl=60)
 
 
 def get_team_last_n_games(team_id: int, n: int = 10, league: str | None = None):

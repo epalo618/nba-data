@@ -2,7 +2,22 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from typing import Optional
 from app.services import nba_service
-from app.services.predictions_common import _norm_cdf, _confidence_label, _decay_avg, get_prop_recommendation
+from app.services.predictions_common import (
+    _norm_cdf, _confidence_label, _decay_avg, get_prop_recommendation,
+    data_confidence, win_prob_from_spread,
+)
+
+# NBA game-to-game scoring std dev ≈ 11 pts (empirically established).
+NBA_STD = 11.0
+HOME_COURT = 2.5
+
+# Games of current-season results before the model fully trusts a team's own
+# numbers over the betting line (which already reflects trades/draft/injuries).
+DATA_RAMP_GAMES = 12
+
+
+def _team_gp(row: dict) -> int:
+    return int(row.get("GP", 0) or 0)
 
 
 def calculate_win_probability(
@@ -11,12 +26,27 @@ def calculate_win_probability(
     home_name: str = "Home",
     away_name: str = "Away",
     league: str | None = None,
+    market: dict | None = None,
 ) -> dict:
-    adv_stats = nba_service.get_team_advanced_stats()
-    adv = {r["TEAM_ID"]: r for r in adv_stats}
+    market = market or {}
+    market_spread = market.get("home_spread")
 
+    adv = {r["TEAM_ID"]: r for r in nba_service.get_team_advanced_stats()}
     home_adv = adv.get(home_team_id, {})
     away_adv = adv.get(away_team_id, {})
+    conf = min(
+        data_confidence(_team_gp(home_adv), DATA_RAMP_GAMES),
+        data_confidence(_team_gp(away_adv), DATA_RAMP_GAMES),
+    )
+
+    if conf <= 0.0 and market_spread is None:
+        return {
+            "home_win_prob": 0.5,
+            "away_win_prob": 0.5,
+            "favored_team": None,
+            "reasons": ["No 2026-27 results and no betting line yet — treated as a coin flip until data arrives."],
+            "factors": {"data_confidence": 0.0, "basis": "none"},
+        }
 
     home_net = float(home_adv.get("NET_RATING", 0) or 0)
     away_net = float(away_adv.get("NET_RATING", 0) or 0)
@@ -25,81 +55,67 @@ def calculate_win_probability(
     away_ortg = float(away_adv.get("OFF_RATING", 110) or 110)
     away_drtg = float(away_adv.get("DEF_RATING", 110) or 110)
 
-    # Recent form: average point differential over last 10 games
-    home_games = nba_service.get_team_last_n_games(home_team_id, 10)
-    away_games = nba_service.get_team_last_n_games(away_team_id, 10)
-
     def recent_net_rating(games: list) -> float:
         diffs = [g.get("PTS", 0) - g.get("PTS_ALLOWED", 0) for g in games]
         return sum(diffs) / len(diffs) if diffs else 0.0
 
-    home_recent = recent_net_rating(home_games)
-    away_recent = recent_net_rating(away_games)
+    home_recent = recent_net_rating(nba_service.get_team_last_n_games(home_team_id, 10))
+    away_recent = recent_net_rating(nba_service.get_team_last_n_games(away_team_id, 10))
 
-    # Blend season net rating (65%) with recent form (35%)
     home_adj = 0.65 * home_net + 0.35 * home_recent
     away_adj = 0.65 * away_net + 0.35 * away_recent
+    model_spread = (home_adj - away_adj) + HOME_COURT
+    model_home_prob = _norm_cdf(model_spread / NBA_STD)
 
-    # Project spread: net rating diff + home court (empirical NBA average: +2.5 pts)
-    HOME_COURT = 2.5
-    spread = (home_adj - away_adj) + HOME_COURT
+    market_home_prob = (
+        win_prob_from_spread(market_spread, NBA_STD) if market_spread is not None else None
+    )
 
-    # Convert spread to win probability via normal CDF
-    # NBA game-to-game std dev ≈ 11 pts (empirically established)
-    NBA_STD = 11.0
-    home_prob = _norm_cdf(spread / NBA_STD)
+    if market_home_prob is None:
+        home_prob, basis = model_home_prob, "model"
+    elif conf <= 0.0:
+        home_prob, basis = market_home_prob, "market"
+    else:
+        home_prob = conf * model_home_prob + (1 - conf) * market_home_prob
+        basis = "blend"
+
+    home_prob = max(0.02, min(0.98, home_prob))
     away_prob = 1 - home_prob
-
     favored = home_name if home_prob >= 0.5 else away_name
     underdog = away_name if home_prob >= 0.5 else home_name
-    fav_net = home_net if home_prob >= 0.5 else away_net
-    dog_net = away_net if home_prob >= 0.5 else home_net
-    fav_recent = home_recent if home_prob >= 0.5 else away_recent
-    dog_recent = away_recent if home_prob >= 0.5 else home_recent
-    fav_ortg = home_ortg if home_prob >= 0.5 else away_ortg
-    fav_drtg = home_drtg if home_prob >= 0.5 else away_drtg
-    dog_ortg = away_ortg if home_prob >= 0.5 else home_ortg
-    dog_drtg = away_drtg if home_prob >= 0.5 else home_drtg
+    fav_prob = max(home_prob, away_prob)
 
-    reasons = []
-
-    net_gap = abs(fav_net - dog_net)
-    if net_gap >= 6:
+    reasons: list[str] = []
+    if basis in ("market", "blend") and market_spread is not None:
+        mag = abs(market_spread)
+        if mag < 1:
+            reasons.append(
+                "Betting line has this as a pick'em — the market (which already reflects offseason trades, "
+                "the draft, and injury news) sees two evenly matched teams."
+            )
+        else:
+            reasons.append(
+                f"Betting line: {favored} favored by {mag:.1f}. The market already accounts for offseason "
+                f"roster moves and injuries; that implies about a {fav_prob:.0%} chance to win."
+            )
+    if basis == "blend":
         reasons.append(
-            f"{favored} has a {net_gap:.1f} pt/100 net rating edge ({fav_net:+.1f} vs {dog_net:+.1f}) — a dominant season-long advantage."
+            f"Weighted {conf:.0%} toward actual 2026-27 results and {1 - conf:.0%} toward the betting line; "
+            f"the mix shifts to on-court results as more games are played."
         )
-    elif net_gap >= 2.5:
-        reasons.append(
-            f"{favored}'s net rating ({fav_net:+.1f}) meaningfully outpaces {underdog}'s ({dog_net:+.1f}) over a full season."
-        )
-
-    recent_gap = fav_recent - dog_recent
-    if recent_gap >= 4:
-        reasons.append(
-            f"{favored} has been outscoring opponents by {fav_recent:+.1f} pts/game recently vs {underdog}'s {dog_recent:+.1f} — strong recent form."
-        )
-    elif recent_gap <= -4:
-        reasons.append(
-            f"{underdog} has better recent form ({dog_recent:+.1f} pt diff L10) but {favored}'s season-long efficiency still projects a win."
-        )
-
-    off_adv = fav_ortg - dog_drtg
-    if off_adv >= 4:
-        reasons.append(
-            f"{favored}'s offense ({fav_ortg:.1f} ORtg) vs {underdog}'s defense ({dog_drtg:.1f} DRtg) is a {off_adv:.1f} pt mismatch."
-        )
-    elif dog_ortg - fav_drtg <= -3:
-        reasons.append(
-            f"{favored}'s defense ({fav_drtg:.1f} DRtg) significantly limits {underdog}'s offense ({dog_ortg:.1f} ORtg)."
-        )
-
-    if home_prob >= 0.5:
-        reasons.append(f"{favored} has home court (+2.5 pts on average).")
-    else:
-        reasons.append(f"{favored}'s efficiency edge overcomes {home_name}'s home court advantage.")
-
+    if basis in ("model", "blend"):
+        fav_net = home_net if favored == home_name else away_net
+        dog_net = away_net if favored == home_name else home_net
+        net_gap = abs(fav_net - dog_net)
+        if net_gap >= 4:
+            reasons.append(
+                f"{favored}'s net rating ({fav_net:+.1f}) outpaces {underdog}'s ({dog_net:+.1f}) by "
+                f"{net_gap:.1f} points per 100 possessions this season."
+            )
+        if favored == home_name:
+            reasons.append(f"{favored} has home court (~{HOME_COURT:.1f} pts on average).")
     if not reasons:
-        reasons.append(f"Close matchup — {favored} holds a slight edge based on net rating and recent form.")
+        reasons.append(f"{favored} holds a slight edge in this matchup.")
 
     return {
         "home_win_prob": round(home_prob, 3),
@@ -107,35 +123,46 @@ def calculate_win_probability(
         "favored_team": favored,
         "reasons": reasons,
         "factors": {
+            "data_confidence": round(conf, 2),
+            "basis": basis,
+            "market_spread": market_spread,
+            "model_spread": round(model_spread, 1),
             "home_net_rating": round(home_net, 2),
             "away_net_rating": round(away_net, 2),
-            "home_recent_net": round(home_recent, 2),
-            "away_recent_net": round(away_recent, 2),
-            "projected_spread": round(spread, 1),
         },
     }
 
 
-def calculate_projected_total(home_team_id: int, away_team_id: int, league: str | None = None) -> float:
-    adv_stats = nba_service.get_team_advanced_stats()
-    adv = {r["TEAM_ID"]: r for r in adv_stats}
+def calculate_projected_total(
+    home_team_id: int,
+    away_team_id: int,
+    league: str | None = None,
+    market: dict | None = None,
+) -> float | None:
+    market = market or {}
+    market_total = market.get("total")
 
+    adv = {r["TEAM_ID"]: r for r in nba_service.get_team_advanced_stats()}
     home = adv.get(home_team_id, {})
     away = adv.get(away_team_id, {})
+    conf = min(
+        data_confidence(_team_gp(home), DATA_RAMP_GAMES),
+        data_confidence(_team_gp(away), DATA_RAMP_GAMES),
+    )
+
+    if conf <= 0.0:
+        return round(market_total, 1) if market_total is not None else None
 
     home_ortg = home.get("OFF_RATING", 110)
     home_drtg = home.get("DEF_RATING", 110)
     away_ortg = away.get("OFF_RATING", 110)
     away_drtg = away.get("DEF_RATING", 110)
-    home_pace = home.get("PACE", 100)
-    away_pace = away.get("PACE", 100)
-    avg_pace = (home_pace + away_pace) / 2
+    avg_pace = (home.get("PACE", 100) + away.get("PACE", 100)) / 2
 
     season_home = ((home_ortg + away_drtg) / 2) * (avg_pace / 100)
     season_away = ((away_ortg + home_drtg) / 2) * (avg_pace / 100)
-    season_proj = season_home + season_away
+    model_total = season_home + season_away
 
-    # Blend with recent form (last 8 games) — captures playoff pace/defense shifts
     try:
         home_games = nba_service.get_team_last_n_games(home_team_id, 8)
         away_games = nba_service.get_team_last_n_games(away_team_id, 8)
@@ -144,19 +171,19 @@ def calculate_projected_total(home_team_id: int, away_team_id: int, league: str 
             vals = [float(g[field]) for g in games if g.get(field) is not None]
             return sum(vals) / len(vals) if vals else None
 
-        h_scored  = _avg(home_games, "PTS")
+        h_scored = _avg(home_games, "PTS")
         h_allowed = _avg(home_games, "PTS_ALLOWED")
-        a_scored  = _avg(away_games, "PTS")
+        a_scored = _avg(away_games, "PTS")
         a_allowed = _avg(away_games, "PTS_ALLOWED")
-
         if all(v is not None for v in [h_scored, h_allowed, a_scored, a_allowed]):
             recent_proj = (h_scored + a_allowed) / 2 + (a_scored + h_allowed) / 2
-            # 60% recent form, 40% season baseline
-            return int(round(0.6 * recent_proj + 0.4 * season_proj))
+            model_total = 0.6 * recent_proj + 0.4 * model_total
     except Exception:
         pass
 
-    return int(round(season_proj))
+    if market_total is None:
+        return int(round(model_total))
+    return round(conf * model_total + (1 - conf) * market_total, 1)
 
 
 def _days_rest(recent_games: list) -> int:

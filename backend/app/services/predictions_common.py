@@ -7,6 +7,36 @@ def _norm_cdf(x: float) -> float:
     return 0.5 * (1 + math.erf(x / math.sqrt(2)))
 
 
+def data_confidence(games_played: int, ramp_games: int) -> float:
+    """Weight (0..1) to place on a team's *own* current-season performance vs. an
+    external anchor (the betting market). 0 games -> 0 (trust the market fully);
+    ramps linearly to 1.0 once the team has `ramp_games` games on the books."""
+    if games_played <= 0 or ramp_games <= 0:
+        return 0.0
+    return min(1.0, games_played / ramp_games)
+
+
+def blend(model_value, anchor_value, weight: float):
+    """Linear blend: weight*model + (1-weight)*anchor, tolerating either side
+    being missing (None)."""
+    if model_value is None:
+        return anchor_value
+    if anchor_value is None:
+        return model_value
+    return weight * model_value + (1 - weight) * anchor_value
+
+
+def win_prob_from_spread(home_spread: float, std: float) -> float:
+    """Convert a betting point spread into a home win probability. `home_spread`
+    is the number next to the home team (negative = home favored), so a -3 line
+    with std 13.5 -> norm_cdf(3/13.5) ~= 0.59. The market spread already prices
+    in injuries, trades and the draft, which is exactly what we lack a box-score
+    signal for early in a season."""
+    if home_spread is None or not std:
+        return 0.5
+    return _norm_cdf(-home_spread / std)
+
+
 def _confidence_label(pct: float) -> str:
     if pct >= 0.70:
         return "STRONG"
