@@ -2,7 +2,14 @@ from app.services import nfl_service
 from app.services.nfl_service import POSITION_STAT_COLS
 from app.services.predictions_common import (
     _norm_cdf, _decay_avg, data_confidence, win_prob_from_spread,
+    anchor_prop_to_line, prop_recommendation,
 )
+
+# Current-season games before a player's own numbers fully outweigh the prop line.
+PLAYER_DATA_RAMP_GAMES = 4
+# Regression-to-mean haircut on last season's per-game average when it's the only
+# thing we have.
+PRIOR_PLAYER_HAIRCUT = 0.90
 
 # Starting estimates only — NFL public-analytics figures commonly cited in this
 # range. Backtest against real tracker results (Phase 8) and adjust.
@@ -223,51 +230,63 @@ def calculate_projected_total(
     return round(combined) if combined is not None else None
 
 
-def project_player_stats(player_id: str, opponent_team_id: int, stat_cols: list[str], is_home: bool = False, league: str | None = None) -> list[dict]:
-    all_players = nfl_service.get_player_season_stats()
-    player_map = {p["PLAYER_ID"]: p for p in all_players}
-    player = player_map.get(player_id)
-    if not player:
+def project_player_stats(player_id: str, opponent_team_id: int, stat_cols: list[str],
+                         is_home: bool = False, league: str | None = None,
+                         prop_lines: dict | None = None) -> list[dict]:
+    prop_lines = prop_lines or {}
+    player = {p["PLAYER_ID"]: p for p in nfl_service.get_player_season_stats()}.get(player_id)
+    prior = nfl_service.get_prior_player_season_stats().get(player_id)
+    src = player or prior
+    if not src:
         return []
 
     # Position-specific stat categories override whatever generic stat_cols the
     # router passed in — NFL props are position-dependent (a QB has no rushing
-    # peers), unlike NBA's fixed PTS/REB/AST/... list. Positions with no defined
-    # categories here (K, DEF/IDP, OL, ...) have no NFL prop stats to project —
-    # falling back to stat_cols (NBA-shaped) would emit bogus all-zero PTS/REB/
-    # etc. rows, so return nothing for them instead.
-    position = player.get("POSITION", "")
-    actual_stats = POSITION_STAT_COLS.get(position)
+    # peers). Positions with no defined categories (K, DEF/IDP, OL, ...) have no
+    # NFL prop stats to project, so return nothing for them.
+    actual_stats = POSITION_STAT_COLS.get(src.get("POSITION", ""))
     if not actual_stats:
         return []
 
-    recent_games = nfl_service.get_player_last_n_games(player_id, 5)
+    player_gp = int((player or {}).get("GP", 0) or 0)
+    recent_games = nfl_service.get_player_last_n_games(player_id, 5)  # empty pre-season
     opp_ranks = nfl_service.get_opponent_stat_ranks().get(opponent_team_id, {})
 
     results = []
     for stat in actual_stats:
-        season_avg = float(player.get(stat, 0) or 0)
-        decayed = _decay_avg(recent_games, stat)
-        l5 = decayed if decayed is not None else season_avg
+        if player is not None:
+            season_avg = float(player.get(stat, 0) or 0)
+            decayed = _decay_avg(recent_games, stat)
+            l5 = decayed if decayed is not None else season_avg
+            base = 0.5 * season_avg + 0.5 * l5
+        else:
+            season_avg = round(float(prior.get(stat, 0) or 0) * PRIOR_PLAYER_HAIRCUT, 1)
+            l5 = season_avg
+            base = season_avg
 
         # 32-team league midpoint (~16.5), mirrors NBA's 30-team (16) calibration.
         opp_rank = int(opp_ranks.get(stat, 16))
         opp_factor = max(-0.08, min(0.08, (16.5 - opp_rank) / 100))
+        model_proj = base * (1 + opp_factor)
 
-        base = 0.5 * season_avg + 0.5 * l5
-        projection = round(base * (1 + opp_factor), 1)
+        line = prop_lines.get(stat)
+        final, basis = anchor_prop_to_line(model_proj, line, player_gp, PLAYER_DATA_RAMP_GAMES)
+        rec = prop_recommendation(final, line)
 
         results.append({
             "player_id": player_id,
-            "player_name": player.get("PLAYER_NAME", ""),
-            "team_abbreviation": player.get("TEAM_ABBREVIATION", ""),
+            "player_name": src.get("PLAYER_NAME", ""),
+            "team_abbreviation": src.get("TEAM_ABBREVIATION", ""),
             "stat": stat,
             "season_avg": round(season_avg, 1),
             "reg_season_avg": round(season_avg, 1),
             "playoff_avg": None,
-            "last5_avg": round(l5, 1) if l5 is not None else round(season_avg, 1),
-            "last10_avg": round(l5, 1) if l5 is not None else round(season_avg, 1),
+            "last5_avg": round(l5, 1),
+            "last10_avg": round(l5, 1),
             "opponent_rank": opp_rank,
-            "projection": projection,
+            "projection": round(final, 1),
+            "line": line,
+            "recommendation": rec,
+            "basis": basis,
         })
     return results

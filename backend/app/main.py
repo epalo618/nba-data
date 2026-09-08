@@ -37,6 +37,8 @@ def _prewarm_nba(service):
     service.get_todays_games()
     service._get_all_game_scores()
     service.get_player_season_stats()
+    service.get_prior_team_advanced()
+    service.get_prior_player_season_stats()
 
     # Pre-warm yesterday's data for the Yesterday page (single API call)
     eastern = ZoneInfo("America/New_York")
@@ -51,6 +53,8 @@ def _prewarm_nfl(service):
     service.get_opponent_stat_ranks()
     service.get_todays_games()
     service.get_player_season_stats()
+    service.get_prior_team_scoring()
+    service.get_prior_player_season_stats()
 
 
 _PREWARM_ROUTINES = {

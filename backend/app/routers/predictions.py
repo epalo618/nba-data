@@ -3,6 +3,8 @@ import numpy as np
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import Response
 from app.dependencies import get_sport_service, get_predictions_service
+from app.services import odds_service
+from app.services.sports_registry import resolve_odds_sport_key
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -35,56 +37,56 @@ def get_player_projections(
 
 
 @router.get("/game/{home_team_id}/vs/{away_team_id}/players")
-def get_game_player_projections(
+async def get_game_player_projections(
     home_team_id: int,
     away_team_id: int,
+    sport: str,
     top_n: int = 8,
     service=Depends(get_sport_service),
     predictions=Depends(get_predictions_service),
 ):
     try:
-        all_player_stats = service.get_player_season_stats()
+        cur_stats = service.get_player_season_stats()
+        prior_stats = service.get_prior_player_season_stats()  # {id: row}
 
-        # Filter to players on each team, sorted by minutes
-        home_players = sorted(
-            [p for p in all_player_stats if p.get("TEAM_ID") == home_team_id],
-            key=lambda x: x.get("MIN", 0),
-            reverse=True,
-        )[:top_n]
+        teams = {t["id"]: t for t in service.get_all_teams()}
+        home_name = teams.get(home_team_id, {}).get("full_name", "")
+        away_name = teams.get(away_team_id, {}).get("full_name", "")
 
-        away_players = sorted(
-            [p for p in all_player_stats if p.get("TEAM_ID") == away_team_id],
-            key=lambda x: x.get("MIN", 0),
-            reverse=True,
-        )[:top_n]
+        # One Odds API request for this matchup (cached ~15 min); {} if unavailable.
+        props_by_player = await odds_service.get_matchup_player_props(
+            resolve_odds_sport_key(sport), home_name, away_name
+        )
 
-        home_projections = []
-        for p in home_players:
-            pid = p["PLAYER_ID"]
-            projs = predictions.project_player_stats(pid, away_team_id, PROP_STATS, is_home=True)
-            home_projections.append({
-                "player_id": pid,
-                "player_name": p["PLAYER_NAME"],
-                "team_abbreviation": p["TEAM_ABBREVIATION"],
-                "projections": projs,
-            })
+        def roster(team_id: int) -> list[dict]:
+            cur = [p for p in cur_stats if p.get("TEAM_ID") == team_id]
+            pool = cur if cur else [p for p in prior_stats.values() if p.get("TEAM_ID") == team_id]
+            return sorted(pool, key=lambda x: x.get("MIN", 0) or 0, reverse=True)[:top_n]
 
-        away_projections = []
-        for p in away_players:
-            pid = p["PLAYER_ID"]
-            projs = predictions.project_player_stats(pid, home_team_id, PROP_STATS, is_home=False)
-            away_projections.append({
-                "player_id": pid,
-                "player_name": p["PLAYER_NAME"],
-                "team_abbreviation": p["TEAM_ABBREVIATION"],
-                "projections": projs,
-            })
+        def build(players: list[dict], opp_id: int, is_home: bool) -> list[dict]:
+            out = []
+            for p in players:
+                pid = p["PLAYER_ID"]
+                name = p.get("PLAYER_NAME", "")
+                lines = props_by_player.get(odds_service._norm_name(name), {})
+                stat_lines = {stat: v.get("line") for stat, v in lines.items() if v.get("line") is not None}
+                projs = predictions.project_player_stats(
+                    pid, opp_id, PROP_STATS, is_home=is_home, prop_lines=stat_lines
+                )
+                out.append({
+                    "player_id": pid,
+                    "player_name": name,
+                    "team_abbreviation": p.get("TEAM_ABBREVIATION", ""),
+                    "projections": projs,
+                })
+            return out
 
         return {
             "home_team_id": home_team_id,
             "away_team_id": away_team_id,
-            "home_players": home_projections,
-            "away_players": away_projections,
+            "props_available": bool(props_by_player),
+            "home_players": build(roster(home_team_id), away_team_id, True),
+            "away_players": build(roster(away_team_id), home_team_id, False),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

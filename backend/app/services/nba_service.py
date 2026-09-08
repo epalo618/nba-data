@@ -159,6 +159,18 @@ def get_player_season_stats(league: str | None = None):
     return _cached("player_season_stats", fetch)
 
 
+def get_prior_player_season_stats(league: str | None = None) -> dict:
+    """{PLAYER_ID: per-game row} from the last completed season. Feeds the prop
+    model only, as a regressed cold-start estimate before the new season has
+    data — not a return to general prior-season seeding."""
+    def fetch():
+        rows = _safe(lambda: leaguedashplayerstats.LeagueDashPlayerStats(
+            season=PRIOR_SEASON, per_mode_detailed="PerGame", timeout=60,
+        ).get_data_frames()[0].to_dict(orient="records"), [])
+        return {int(r["PLAYER_ID"]): r for r in rows}
+    return _cached(f"prior_player_season_stats_{PRIOR_SEASON}", fetch)
+
+
 def get_opponent_stat_ranks(league: str | None = None) -> dict:
     """Per-stat defensive ranks per team. rank 1 = worst defense (allows most).
     Current-season only; empty until the season tips off."""
