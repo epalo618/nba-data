@@ -269,6 +269,44 @@ def get_prior_player_season_stats(league: str | None = None) -> dict:
     return _cached(f"prior_player_season_stats_{PRIOR_SEASON}", fetch)
 
 
+def get_current_rosters(league: str | None = None) -> dict:
+    """{TEAM_ID: [ {PLAYER_ID, PLAYER_NAME, TEAM_ID, TEAM_ABBREVIATION, POSITION}, ... ]}
+    for CURRENT_SEASON, built from nflverse's published roster file. This is the
+    authoritative "who's on which team right now" source: it reflects offseason
+    trades, free-agent signings, cuts and the draft, none of which the
+    prior-season stat rows (keyed to last year's team) know about.
+
+    Only active-roster skill players (QB/RB/WR/TE — the positions that have prop
+    categories) are returned. Per-game stat averages are still looked up
+    separately by PLAYER_ID; this getter only decides matchup-page list
+    membership and the team label shown next to each name. Empty until the roster
+    file publishes — nflverse posts it in the preseason, well before any game
+    stats exist."""
+    def fetch():
+        m = _team_id_map()
+        try:
+            rows = nfl.load_rosters(seasons=[CURRENT_SEASON]).to_dicts()
+        except Exception:
+            return {}
+        by_team: dict = {}
+        for r in rows:
+            if r.get("status") != "ACT" or r.get("position") not in POSITION_STAT_COLS:
+                continue
+            tid = m["abbr_to_id"].get(r.get("team"))
+            pid = r.get("gsis_id")
+            if tid is None or not pid:
+                continue
+            by_team.setdefault(tid, []).append({
+                "PLAYER_ID": pid,
+                "PLAYER_NAME": r.get("full_name"),
+                "TEAM_ID": tid,
+                "TEAM_ABBREVIATION": r.get("team"),
+                "POSITION": r.get("position"),
+            })
+        return by_team
+    return _cached(f"current_rosters_{CURRENT_SEASON}", fetch, ttl=21600)
+
+
 def get_opponent_stat_ranks(league: str | None = None) -> dict:
     """Single overall defensive rank (by total yards allowed/game) applied to every
     stat category — a v1 simplification vs. NBA's true per-stat opponent ranking.

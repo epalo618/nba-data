@@ -58,7 +58,24 @@ async def get_game_player_projections(
             resolve_odds_sport_key(sport), home_name, away_name
         )
 
+        cur_by_id = {p["PLAYER_ID"]: p for p in cur_stats}
+        # Current-season roster feed (NFL only): the roster-move-aware list of who
+        # is actually on each team now. NBA's service has no equivalent yet.
+        current_rosters = getattr(service, "get_current_rosters", lambda: {})()
+
         def roster(team_id: int) -> list[dict]:
+            ros = current_rosters.get(team_id)
+            if ros:
+                # Rank by usage — this season if it's underway, otherwise last
+                # season's rate — and drop players with no history to project
+                # from (rookies with no prop line add an empty row otherwise).
+                def usage(p):
+                    s = cur_by_id.get(p["PLAYER_ID"]) or prior_stats.get(p["PLAYER_ID"])
+                    return (s or {}).get("MIN", 0) or 0
+                ranked = sorted(ros, key=usage, reverse=True)
+                return [p for p in ranked if usage(p) > 0][:top_n] or ranked[:top_n]
+            # Pre-roster-feed fallback: current-season stats, else prior-season
+            # rows attributed to the team the player finished last season on.
             cur = [p for p in cur_stats if p.get("TEAM_ID") == team_id]
             pool = cur if cur else [p for p in prior_stats.values() if p.get("TEAM_ID") == team_id]
             return sorted(pool, key=lambda x: x.get("MIN", 0) or 0, reverse=True)[:top_n]
