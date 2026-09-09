@@ -94,6 +94,7 @@ async def get_game_player_projections(
                     "player_id": pid,
                     "player_name": name,
                     "team_abbreviation": p.get("TEAM_ABBREVIATION", ""),
+                    "position": p.get("POSITION", "") or "",
                     "projections": projs,
                 })
             return out

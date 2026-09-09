@@ -9,6 +9,34 @@ import StatCard from '../components/StatCard'
 import MatchupStatCards from '../components/matchup/MatchupStatCards'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 
+const POSITION_ORDER = ['QB', 'RB', 'FB', 'WR', 'TE']
+const POSITION_LABEL: Record<string, string> = {
+  QB: 'Quarterbacks',
+  RB: 'Running Backs',
+  FB: 'Fullbacks',
+  WR: 'Wide Receivers',
+  TE: 'Tight Ends',
+}
+
+// Split a team's prop list into position groups (QB / RB / WR / TE ...). Sports
+// whose player rows carry no position (NBA) fall back to a single unlabeled group.
+function groupByPosition(players: any[]): { pos: string; label: string; players: any[] }[] {
+  if (!players.some((p) => p.position)) return [{ pos: '', label: '', players }]
+  const buckets = new Map<string, any[]>()
+  for (const p of players) {
+    const pos = p.position || 'Other'
+    if (!buckets.has(pos)) buckets.set(pos, [])
+    buckets.get(pos)!.push(p)
+  }
+  return [...buckets.keys()]
+    .sort((a, b) => {
+      const ai = POSITION_ORDER.indexOf(a)
+      const bi = POSITION_ORDER.indexOf(b)
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi) || a.localeCompare(b)
+    })
+    .map((pos) => ({ pos, label: POSITION_LABEL[pos] ?? pos, players: buckets.get(pos)! }))
+}
+
 export default function GameMatchup() {
   const { homeId, awayId } = useParams<{ homeId: string; awayId: string }>()
   const { sport: s } = useCurrentSport()
@@ -129,21 +157,30 @@ export default function GameMatchup() {
             ].map(({ label, players }) => (
               <div key={label} className="bg-surface-card border border-surface-border rounded-xl p-5">
                 <h3 className="text-white font-semibold mb-3">{label}</h3>
-                {players.map((p: any) => (
-                  <div key={p.player_id} className="mb-5">
-                    <div className="text-sm font-bold text-brand mb-1">{p.player_name}</div>
-                    <div className="grid grid-cols-8 gap-2 text-xs text-gray-600 mb-1 px-0">
-                      <span>STAT</span>
-                      <span>REG</span>
-                      <span className="text-yellow-700">POST</span>
-                      <span>L10</span>
-                      <span>L5</span>
-                      <span className="font-semibold text-gray-400">PROJ</span>
-                      <span>LINE</span>
-                      <span>SIGNAL</span>
-                    </div>
-                    {(p.projections ?? []).map((proj: any) => (
-                      <PlayerPropRow key={proj.stat} proj={proj} />
+                {groupByPosition(players).map((group) => (
+                  <div key={group.pos || 'all'} className="mb-4">
+                    {group.label && (
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 border-b border-surface-border pb-1 mb-2">
+                        {group.label}
+                      </div>
+                    )}
+                    {group.players.map((p: any) => (
+                      <div key={p.player_id} className="mb-5">
+                        <div className="text-sm font-bold text-brand mb-1">{p.player_name}</div>
+                        <div className="grid grid-cols-8 gap-2 text-xs text-gray-600 mb-1 px-0">
+                          <span>STAT</span>
+                          <span>REG</span>
+                          <span className="text-yellow-700">POST</span>
+                          <span>L10</span>
+                          <span>L5</span>
+                          <span className="font-semibold text-gray-400">PROJ</span>
+                          <span>LINE</span>
+                          <span>SIGNAL</span>
+                        </div>
+                        {(p.projections ?? []).map((proj: any) => (
+                          <PlayerPropRow key={proj.stat} proj={proj} />
+                        ))}
+                      </div>
                     ))}
                   </div>
                 ))}
